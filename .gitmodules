@@ -1,0 +1,3 @@
+[submodule "ILLIXR"]
+	path = ILLIXR
+	url = git@github.com:ILLIXR/ILLIXR.git

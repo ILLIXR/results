@@ -1,0 +1,14 @@
+run:
+  mode: opt
+  time: 60s
+  plugins: See ./ILLIXR/Makefile
+  system: sam's laptop
+  notes:
+    - My laptop is fairly underpowered and has low disk I/O (relevant for `offline_imu_cam`)
+    - I removed many of the prints, for performance reasons, when built in `opt`.
+    - I started compiling OpenVINS with `-DCMAKE_BUILD_TYPE=Release` when the rest of ILLIXR is built in `opt`.
+    - I have debugview turned on.
+    - I don't have ZED, which is a major contributor.
+    - I don't have the application timers.
+    - I don't distinguish OpenVINS IMU updates from camera updates.
+    - I don't distinguish in `offline_imu_cam` between iterations which just send the IMU and iterations which load and send the images.
