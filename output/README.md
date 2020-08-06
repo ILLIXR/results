@@ -16,7 +16,7 @@ An "account" is a tuple of plugin and activity, where "activity" is either "iter
 
 - [`duration_hists/`](./duration_hists/) is nice to see the clean distribution of the durations.
   - The orange points are points whose x-coordinate is a raw data point and y-coordinate is randomly scattered for visual effect.
-  - Most are a really satisfyingly normal, like debugview-iter below.
+  - Most are a satisfyingly normal, like debugview-iter below.
   - ![](./duration_hists/debugview-iter.png)
   - However, SLAM and `offline_imu_cam` are horribly bimodal (as we expect because IMU processing vs IMU+image processing)
   - ![](./duration_hists/slam2-cb.png)
@@ -26,9 +26,12 @@ An "account" is a tuple of plugin and activity, where "activity" is either "iter
 
 - [`period_hists/`](./period_hists/) is to check if the components are running at their right period, or if they have outliers.
   - They mostly are, but with a few outliers.
+  - Note that the axes are scaled to the min and max, so if the x-axis ends at +70ms, there was a real datapoint out there, and it might be too small to see.
+  - Some of the variation in the period could be due to imprecise sleeping. Many of the `_p_should_skip` functions simply sleep and then return.
   - ![](./period_hists/audio_component-iter.png)
   - You often see a bi-modal or tri-modal distribution, often with a space of about 10ms between peaks. This is probably the scheduling quantum.
     - If the component is ready when it gets scheduled, we see a normal distribution around 0.
-    - If it has to wait 1 quantum, we see a normal distribution around 10ms.
+    - If it has to wait 1 quantum, we see a normal distribution around ~20ms.
+    - If it has to wait 2 quantum, we see a normal distribution around ~40ms.
     - et cetera, all summed together (a [Mixed Gaussian](https://en.wikipedia.org/wiki/Mixture_model)--if you will).
     - ![](./period_hists/offline_imu_cam-skip.png)
