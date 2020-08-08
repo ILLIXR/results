@@ -1,5 +1,5 @@
 run:
-  mode: opt
+  mode: dbg
   time: 60s
   plugins: See ./ILLIXR/Makefile
   system: Jae's Desktop (CPU: i7-7700k, GPU: NVIDIA GTX 1070
