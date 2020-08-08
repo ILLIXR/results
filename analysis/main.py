@@ -33,7 +33,7 @@ with ch_time_block.ctx("Read SQLite tables", print_start=False):
     threadloop_skip_stop       = read_illixr_table("threadloop_skip_stop"      , ["plugin_id", "iteration_no", "skip_no"])
     switchboard_callback_start = read_illixr_table("switchboard_callback_start", ["plugin_id", "serial_no"])
     switchboard_callback_stop  = read_illixr_table("switchboard_callback_stop" , ["plugin_id", "serial_no"])
-    switchboard_topic_stop     = read_illixr_table("switchboard_topic_stop"    , ["topic_name"])
+    #switchboard_topic_stop     = read_illixr_table("switchboard_topic_stop"    , ["topic_name"])
 
 def compute_durations(start: pd.DataFrame, stop: pd.DataFrame):
     ts = pd.merge(
