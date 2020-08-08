@@ -6,6 +6,7 @@ run:
   notes:
     - I removed many of the prints, for performance reasons, when built in `opt`.
     - I started compiling OpenVINS with `-DCMAKE_BUILD_TYPE=Release` when the rest of ILLIXR is built in `opt`.
+    - I piped to file so that I can avoid stdout bottleneck.
   caveats:
     - My laptop is fairly underpowered and has low disk I/O (relevant for `offline_imu_cam`)
     - I don't have ZED, which is a major contributor.
