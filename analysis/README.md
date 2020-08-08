@@ -5,11 +5,19 @@ I use [`poetry`](https://python-poetry.org/) to manage its dependencies.
 To use this script yourself, do
 
 ```
+sudo apt update
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt install python3.8
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10
+sudo apt-get install python-pip
+
 # We need dev headers for to compile a certain package
-sudo apt install -y python3.8-dev
+sudo apt-get install -y python3.8-dev
 
 # Install poetry
 curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+
 
 cd analysis
 # Install Python package dependencies

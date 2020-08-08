@@ -2,12 +2,5 @@ run:
   mode: opt
   time: 60s
   plugins: See ./ILLIXR/Makefile
-  system: sam's laptop
-  notes:
-    - I removed many of the prints, for performance reasons, when built in `opt`.
-    - I started compiling OpenVINS with `-DCMAKE_BUILD_TYPE=Release` when the rest of ILLIXR is built in `opt`.
-  caveats:
-    - My laptop is fairly underpowered and has low disk I/O (relevant for `offline_imu_cam`)
-    - I don't have ZED, which is a major contributor.
-    - I don't have the application timers.
-    - I don't distinguish OpenVINS IMU updates from camera updates.
+  system: Jetson AGX Xavier (MAXN Mode)
+  notes: 
