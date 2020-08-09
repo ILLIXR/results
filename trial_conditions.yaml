@@ -1,7 +1,11 @@
 run:
-  mode: dbg
+  mode: opt
   time: 60s
-  plugins: See ./ILLIXR/Makefile
+  plugins: +zed, +hologram, -offline_imu_cam
   system: Jae's Desktop (CPU: i7-7700k, GPU: NVIDIA GTX 1070
   notes:
-
+	- Sponza test
+		- App Inner Total: 62491093813 (nanoseconds)
+		- App CPU Total: 30099194074 (nanoseconds)
+	- Timewarp is still quite high. 
+	- piped file 
