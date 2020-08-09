@@ -4,8 +4,7 @@ run:
   plugins: +zed, +hologram, -offline_imu_cam
   system: Jae's Desktop (CPU: i7-7700k, GPU: NVIDIA GTX 1070
   notes:
-	- Sponza test
-		- App Inner Total: 62491093813 (nanoseconds)
-		- App CPU Total: 30099194074 (nanoseconds)
-	- Timewarp is still quite high. 
-	- piped file 
+  - AR app test:
+  - App Inner Total 60252154315
+  - App CPU Total 8078367579
+  - The AR app (with simple bounce physics and a rock mesh) uses signficantly less CPU time. 
