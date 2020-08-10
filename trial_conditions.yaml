@@ -4,7 +4,11 @@ run:
   plugins: +zed, +hologram, -offline_imu_cam
   system: Jae's Desktop (CPU: i7-7700k, GPU: NVIDIA GTX 1070
   notes: 
-  - Sponza Test
+  - Sponza Test (output):
   - App CPU Total 28486645235
   - App Inner Total 60790107802
+
+  - AR Test (output_ar):
+  - App CPU Total 7692274247
+  - App Inner Total 57660169128
 
