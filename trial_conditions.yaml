@@ -11,4 +11,3 @@ run:
     - My laptop is fairly underpowered and has low disk I/O (relevant for `offline_imu_cam`)
     - I don't have ZED, which is a major contributor.
     - I don't have the application timers.
-    - I don't distinguish OpenVINS IMU updates from camera updates.
