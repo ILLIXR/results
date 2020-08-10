@@ -188,7 +188,7 @@ def nice_histogram(ys: np.array, label: str, title: str, account: str, path: Pat
     ax.plot(ys, np.random.randn(*ys.shape) * (ax.get_ylim()[1] * 0.2) + (ax.get_ylim()[1] * 0.5) * np.ones(ys.shape), linestyle='', marker='.', ms=1)
     ax.set_title(title)
     ax.set_xlabel(label)
-    fig.savefig(path / f"{account}.png")
+    fig.savefig(path / f"{account.replace(' ', '-')}.png")
     plt.close(fig)
 
 with ch_time_block.ctx("Plot histograms", print_start=False):

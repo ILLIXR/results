@@ -11,7 +11,7 @@
   - ![](./cpu_time_per_account.png)
 
 - Timeseries
-  - ![](./accounts_duration_normalized_timeseries.png)
+  - ![](./accounts_durations_normalized_timeseries.png)
   - This is not as informative as I would like
   - Even when I zoom in, the timeseries are too chaotic, and end up hiding each other.
 
@@ -43,35 +43,35 @@
 ```
   - 
     - The reliable sleep doesn't count much towards the duration, because we measure CPU active time.
-    - ![](./cpu_duration_hists/offline_imu_cam skip.png)
+    - ![](./cpu_duration_hists/offline_imu_cam-skip.png)
 
 - [`utilization_hists/`](./utilization_hists/) is interesting. It is the CPU time / wall time for an iteration.
   - We can tell off-the-bat that `audio_component iter` is CPU-bound while `gldemo iter` is not, and `offline_imu_cam iter imu` depends.
-    - ![](./utilization_hists/audio_component iter.png)
-    - ![](./utilization_hists/gldemo iter.png)
-    - ![](./utilization_hists/offline_imu_cam iter imu.png)
+    - ![](./utilization_hists/audio_component-iter.png)
+    - ![](./utilization_hists/gldemo-iter.png)
+    - ![](./utilization_hists/offline_imu_cam-iter-imu.png)
   - I don't know how some iterations have utilization > 100%. It is possible that the CPU timer and wall timer are not at the same granularity, since they are coming from different sources, and this could introduce noise.
-    - ![](./utilization_hists/gldemo skip.png)
+    - ![](./utilization_hists/gldemo-skip.png)
 
 - [`period_hists/`](./period_hists/)
   - Mostly uni-modal bell-shaped.
-    - ![](./period_hists/audio_component iter.png)
-    - ![](./period_hists/audio_component skip.png)
+    - ![](./period_hists/audio_component-iter.png)
+    - ![](./period_hists/audio_component-skip.png)
   - However, sometimes a bimodal distribution emerges from whether or not the `should_skip` yields a scheduling quantum.
-    - ![](./period_hists/timewarp_gl skip.png)
+    - ![](./period_hists/timewarp_gl-skip.png)
   - SLAM2's callbacks should theoretically be the same as they are in the dataset.
     - The IMU data is mostly good. Either we are behind schedule (period between calls = 0), or we need to wait (period between calls = 50ms)
-      - ![](./period_hists/slam2 cb cam.png)
+      - ![](./period_hists/slam2-cb-cam.png)
     - I think this callback is always late, so the period is dominated by the duration (no wait time).
-    - ![](./period_hists/slam2 cb imu.png)
+    - ![](./period_hists/slam2-cb-imu.png)
 	- For reference, the CPU durations
-    - ![](./cpu_duration_hists/slam2 cb imu.png)
+    - ![](./cpu_duration_hists/slam2-cb-imu.png)
 
 - [`gpu_duration_hists/`](./gpu_duration_hists/) Only one plugin in my experiment used GPU.
-  - ![](./gpu_duration_hists/timewarp_gl GPU calls.png)
+  - ![](./gpu_duration_hists/timewarp_gl-GPU-calls.png)
   - It still seems slow (1ms).
   - The outliers are troubling.
 
 - [`gpu_overhead_hists/`](./gpu_overhead_hists/) GPU time / CPU time.
-  - ![](./gpu_overhead_hists/timewarp_gl GPU calls.png)
+  - ![](./gpu_overhead_hists/timewarp_gl-GPU-calls.png)
   - Seems good. CPU spends 2% of time telling GPU what to do.
