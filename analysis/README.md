@@ -5,11 +5,21 @@ I use [`poetry`](https://python-poetry.org/) to manage its dependencies.
 To use this script yourself, do
 
 ```
+# Pointer to ILLIXR data
+export ILLIXR_DATA=/path/to/ILLIXR/data1
+
+# ensure submodules are updated
+git submodule update --init --recursive
+
+# Collect the actual data.
+# Notice, we are piping the ouptut into a fil
+rm -rf metrics && mkdir metrics && make -C ILLIXR run.opt > metrics/output.log
+
 # We need dev headers for to compile a certain package
 sudo apt install -y python3.8-dev
 
 # Install poetry
-curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3
 
 cd analysis
 # Install Python package dependencies
@@ -18,4 +28,6 @@ poetry install
 poetry run python main.py
 ```
 
-Only the last line needs to be re-run.
+After the initial run, only the `rm -rf ...`, `cd analysis`, and `poetry run ...` need to be rerun.
+
+Note that this uses the copy of ILLIXR _in this repo's submodule_, so `git pull` inside the submodule when you want to try a new version.
