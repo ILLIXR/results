@@ -1,7 +1,10 @@
+import collections
 import itertools
 from pathlib import Path
 from typing import Iterable, List, Any, Tuple, Optional
 import sqlite3
+import copy
+import re
 import shutil
 
 from tqdm import tqdm
@@ -34,13 +37,30 @@ with ch_time_block.ctx("Read SQLite tables", print_start=False):
     threadloop_skip_stop       = read_illixr_table("threadloop_skip_stop"      , ["plugin_id", "iteration_no", "skip_no"])
     switchboard_callback_start = read_illixr_table("switchboard_callback_start", ["plugin_id", "iteration_no"])
     switchboard_callback_stop  = read_illixr_table("switchboard_callback_stop" , ["plugin_id", "iteration_no"])
-    #switchboard_topic_stop     = read_illixr_table("switchboard_topic_stop"    , ["topic_name"])
+    switchboard_topic_stop     = read_illixr_table("switchboard_topic_stop"    , ["topic_name"])
     switchboard_check_qs_start = read_illixr_table("switchboard_check_queues_start", ["iteration_no"])
     switchboard_check_qs_stop  = read_illixr_table("switchboard_check_queues_stop" , ["iteration_no"])
     timewarp_gpu_start         = read_illixr_table("timewarp_gpu_start"        , ["iteration_no"])
     timewarp_gpu_stop          = read_illixr_table("timewarp_gpu_stop"         , ["iteration_no"])
-    #offline_imu_cam            = read_illixr_table("offline_imu_cam"           , ["iteration_no"])
-    #offline_imu_cam["has_camera"] = offline_imu_cam["has_camera"] == 1
+    offline_imu_cam            = read_illixr_table("offline_imu_cam"           , ["iteration_no"])
+    offline_imu_cam["has_camera"] = offline_imu_cam["has_camera"] == 1
+
+    output_log = Path("..") / "metrics/output.log"
+    if not output_log.exists():
+        raise ValueError("metrics/ouptut.log does not exist. Pipe the output into it.")
+
+    slam2_thread_start = {"account_name": [], "iteration_no": [], "cpu_time": [], "wall_time": []}
+    slam2_thread_stop  = copy.deepcopy(slam2_thread_start)
+    with output_log.open("r") as f:
+        for line in f:
+            if m := re.match(r"cpu_timer,(start|stop),([^,]*),([^,]*),(\d+),(\d+)\s+", line):
+                dct = [slam2_thread_start, slam2_thread_stop][m.group(1) == "stop"]
+                dct["account_name"].append(m.group(2))
+                dct["iteration_no"].append(int(m.group(3)))
+                dct["cpu_time"].append(int(m.group(4)))
+                dct["wall_time"].append(int(m.group(5)))
+    slam2_thread_start = pd.DataFrame.from_dict(slam2_thread_start).set_index(["account_name", "iteration_no"])
+    slam2_thread_stop  = pd.DataFrame.from_dict(slam2_thread_stop ).set_index(["account_name", "iteration_no"])
 
 def compute_durations(start: pd.DataFrame, stop: pd.DataFrame, account_name: Optional[str], suffix: Optional[str]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     ts = pd.merge(
@@ -51,16 +71,19 @@ def compute_durations(start: pd.DataFrame, stop: pd.DataFrame, account_name: Opt
         suffixes=("_start", "_stop")
     )
     for clock in ["cpu", "wall", "gpu"]:
-        if f"{clock}_time_start" in ts:
-            # convert from ns to ms
-            start_of_time = min(
-                ts[f"{clock}_time_start"].min(),
-                ts[f"{clock}_time_stop" ].min(),
-            )
-            ts[f"{clock}_time_start"] = (ts[f"{clock}_time_start"] - start_of_time) / 1e6
-            ts[f"{clock}_time_stop" ] = (ts[f"{clock}_time_stop" ] - start_of_time) / 1e6
+        if f"{clock}_time_start" not in ts:
+            ts[f"{clock}_time_start"] = 0
+            ts[f"{clock}_time_stop"] = 0
 
-            ts[f"{clock}_duration" ] = ts[f"{clock}_time_stop" ] - ts[f"{clock}_time_start" ]
+        # convert from ns to ms
+        start_of_time = min(
+            ts[f"{clock}_time_start"].min(),
+            ts[f"{clock}_time_stop" ].min(),
+        )
+        ts[f"{clock}_time_start"] = (ts[f"{clock}_time_start"] - start_of_time) / 1e6
+        ts[f"{clock}_time_stop" ] = (ts[f"{clock}_time_stop" ] - start_of_time) / 1e6
+
+        ts[f"{clock}_duration" ] = ts[f"{clock}_time_stop" ] - ts[f"{clock}_time_start" ]
 
     # compute periods
     ts["period"] = ts["wall_time_start"].diff()
@@ -75,6 +98,8 @@ def compute_durations(start: pd.DataFrame, stop: pd.DataFrame, account_name: Opt
         )["plugin_name"].map(str) + f" {suffix}"
     elif account_name and not suffix:
         ts["account_name"] = account_name
+    elif not account_name and not suffix:
+        pass
     else:
         raise ValueError("Provide account_name or suffix, but not both")
 
@@ -89,27 +114,26 @@ with ch_time_block.ctx("Compute joins", print_start=False):
         compute_durations(switchboard_callback_start, switchboard_callback_stop, None              , "cb"),
         compute_durations(switchboard_check_qs_start, switchboard_check_qs_stop, "runtime check_qs", None),
         compute_durations(timewarp_gpu_start        , timewarp_gpu_stop        , "timewarp_gl gpu" , None),
+        compute_durations(slam2_thread_start        , slam2_thread_stop        , None              , None),
     ]).sort_index()
 
     # need to reset index to mutate it
     all_ts["account_name"] = all_ts.index.droplevel(1)
     all_ts["iteration_no"] = all_ts.index.droplevel(0)
 
-    #bool_mask_cam = all_ts.join(offline_imu_cam)["has_camera"].fillna(value=False)
+    bool_mask_cam = all_ts.join(offline_imu_cam)["has_camera"].fillna(value=False)
 
-    #offline_imu_cam_mask = all_ts["account_name"] == "offline_imu_cam iter"
-    #all_ts.loc[offline_imu_cam_mask & bool_mask_cam, "account_name"] = "offline_imu_cam iter cam"
-    #all_ts.loc[offline_imu_cam_mask &~bool_mask_cam, "account_name"] = "offline_imu_cam iter imu"
+    offline_imu_cam_mask = all_ts["account_name"] == "offline_imu_cam iter"
+    all_ts.loc[offline_imu_cam_mask & bool_mask_cam, "account_name"] = "offline_imu_cam iter cam"
+    all_ts.loc[offline_imu_cam_mask &~bool_mask_cam, "account_name"] = "offline_imu_cam iter imu"
 
-    #slam2_mask = all_ts["account_name"] == "slam2 cb"
-    #all_ts.loc[slam2_mask & bool_mask_cam, "account_name"] = "slam2 cb cam"
-    #all_ts.loc[slam2_mask &~bool_mask_cam, "account_name"] = "slam2 cb imu"
+    slam2_mask = all_ts["account_name"] == "slam2 cb"
+    all_ts.loc[slam2_mask & bool_mask_cam, "account_name"] = "slam2 cb cam"
+    all_ts.loc[slam2_mask &~bool_mask_cam, "account_name"] = "slam2 cb imu"
 
     # all done mutating index.
     # Restore it.
     all_ts = all_ts.reset_index(drop=True).set_index(["account_name", "iteration_no"])
-    print(all_ts.head())
-    #print(all_ts.loc["slam2 cb cam"].head())
 
     aggs = {
         "period"       : ["mean", "std"],
@@ -145,18 +169,31 @@ with ch_time_block.ctx("Plot bar chart of CPU time share", print_start=False):
     # plt.close(ax.get_figure())
 
     summaries.sort_values("cpu_duration_sum", inplace=True)
-    summaries["cpu_duration_share"] = summaries["cpu_duration_sum"] / total_cpu_time * 100
+    summaries["cpu_duration_share"] = summaries["cpu_duration_sum"] / total_cpu_time
     # I derived this from the Central Limit Theorem
-    # I believe sigma_sum^2 = sigma_individ^2 / sqrt(n).
-    summaries["cpu_duration_std"] = summaries["cpu_duration_std"] / summaries["count"]**(1/4) / total_cpu_time * summaries["count"]
+    # sigma_sum^2 = sigma_individ^2 / sqrt(n).
+    # sigma_sum = sigma_individ / n^(1/4)
+    # 
+    summaries["cpu_duration_std"] = summaries["cpu_duration_std"] * summaries["count"]**(3/4) / total_cpu_time
+
+    summaries2_share = collections.defaultdict(lambda: 0)
+    summaries2_std = collections.defaultdict(lambda: 0)
+    account_group_names = []
+    for account_name in summaries.index:
+        account_group_name = account_name.split(" ")[0]
+        summaries2_share[account_group_name] += summaries.loc[account_name]["cpu_duration_share"]
+        summaries2_std[account_group_name] = np.sqrt(summaries.loc[account_name]["cpu_duration_std"]**2 + summaries2_std[account_group_name]**2)
+        account_group_names.append(account_group_name)
+
     fig = plt.figure()
     ax = fig.gca()
     ax.bar(
-        x=summaries.index,
-        height=summaries["cpu_duration_share"],
-        yerr=summaries["cpu_duration_std"],
+        x=account_group_names,
+        height=[100*summaries2_share[account_group_name] for account_group_name in account_group_names],
+        yerr  =[100*summaries2_std  [account_group_name] for account_group_name in account_group_names],
     )
-    ax.set_xticklabels(summaries.index, rotation=90)
+    ax.set_ylim(0, 100)
+    ax.set_xticklabels(account_group_names, rotation=90)
     ax.set_ylabel("% of total CPU time")
     ax.set_title("Breakdown of total CPU time")
 
