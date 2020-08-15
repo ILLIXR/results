@@ -138,6 +138,12 @@ def compute_durations(
             {
                 f"{clock}_time_start": (ts[f"{clock}_time_start"] - starts[clock]) / 1e6 if clock in starts else 0,
                 f"{clock}_time_stop" : (ts[f"{clock}_time_stop" ] - starts[clock]) / 1e6 if clock in starts else 0,
+            }
+            for clock in clocks
+        )
+    )
+    ts = ts.assign(**dict_concat(
+            {
                 f"{clock}_time_duration": ts[f"{clock}_time_stop"] - ts[f"{clock}_time_start"] if clock in starts else 0,
             }
             for clock in clocks
@@ -283,6 +289,33 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             set_account_name(stdout_cpu_timer),
             set_account_name(timewarp_gpu, "timewarp_gl gpu"),
         ])).sort_index()
+
+        account_names = ts.index.levels[0]
+        thread_ids["missing_cpu_time_usage"] = np.NaN
+        thread_ids["total_cpu_time_usage"] = np.NaN
+
+        used = 0
+        start = np.inf
+        stop = 0
+        for account_name in account_names:
+            if account_name.endswith(" cb"):
+                used += ts.loc[account_name, "cpu_time_duration"].sum()
+                start = min(start, ts.loc[account_name, "cpu_time_start"].min())
+                stop  = max(stop , ts.loc[account_name, "cpu_time_start"].max())
+        used += ts.loc["runtime check_qs", "cpu_time_duration"].sum()
+        start = min(start, ts.loc["runtime check_qs", "cpu_time_start"].min())
+        stop  = max(stop , ts.loc["runtime check_qs", "cpu_time_stop" ].max())
+        thread_ids.loc[thread_ids["sub_name"] == "0", "total_cpu_time_usage"] = stop - start
+        thread_ids.loc[thread_ids["sub_name"] == "0", "missing_cpu_time_usage"] = stop - start - used
+
+        for account_name in account_names:
+            if account_name.endswith(" iter"):
+                thread_name = account_name.split(" ")[0]
+                used  = ts.loc[account_name, "cpu_time_duration"].sum()
+                start = ts.loc[account_name, "cpu_time_start"   ].min()
+                stop  = ts.loc[account_name, "cpu_time_stop"    ].max()
+                thread_ids.loc[thread_ids["sub_name"] == thread_name, "total_cpu_time_usage"] = stop - start
+                thread_ids.loc[thread_ids["sub_name"] == thread_name, "missing_cpu_time_usage"] = stop - start - used
 
     with ch_time_block.ctx("split accounts", print_start=False):
         bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
