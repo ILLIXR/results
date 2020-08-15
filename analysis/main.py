@@ -15,7 +15,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-verify_integrity = True
+T = TypeVar("T")
+V = TypeVar("V")
+def it_concat(its: Iterable[Iterable[T]]) -> Iterable[T]:
+    return itertools.chain.from_iterable(its)
+
+def list_concat(lsts: Iterable[List[T]]) -> List[T]:
+    return list(itertools.chain.from_iterable(lsts))
+
+def dict_concat(dcts: Iterable[Dict[T, V]], **kwargs) -> Dict[T, V]:
+    return dict(it_concat(dct.items() for dct in dcts), **kwargs)
+
+verify_integrity = False
 
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
     db_path = metrics_path / (table_name + ".sqlite")
@@ -27,38 +38,51 @@ def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]
         .sort_index()
     )
 
+def is_int(string: str) -> bool:
+    return bool(re.match(r"\d+", string))
+
+def is_float(string: str) -> bool:
+    return bool(re.match(r"\d+.\d+", string))
+
 def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str], other_cols: List[str]) -> pd.DataFrame:
     cols = index_cols + other_cols
     pattern = re.compile(
-        r"^{record_name},"
+        rf"^{record_name},"
         + r",".join(fr"(?P<{col}>[^,]+)" for col in cols)
         + r"\s+$"
     )
 
-    df_as_dict = {col: [] for col in cols}
+    df_as_dict: Dict[str, List[str]] = {col: [] for col in cols}
 
     output_log = metrics_path / "output.log"
     if not output_log.exists():
         raise ValueError(f"{metrics_path!s}/ouptut.log does not exist. Pipe the output into it.")
 
+    close_miss = 0
     with output_log.open("r") as f:
         for line in f:
             if match := pattern.match(line):
                 for col in cols:
                     df_as_dict[col].append(match.group(col))
+            elif line.startswith(record_name + ","):
+                close_miss += 1
+    hits = len(df_as_dict[index_cols[0]])
+    if hits / (hits + close_miss) < 0.95:
+        warnings.warn(UserWarning(f"Many ({close_miss} / {close_miss + hits}) lines of {record_name} were spliced incorrectly."))
 
     return (
-        pd.DataFrame.from_dict(df_as_dict)
+        pd.DataFrame.from_dict({
+            key: (
+                map(int, col) if all(map(is_int, col)) else
+                map(float, col) if all(map(is_float, col)) else
+                col
+            )
+            for key, col in df_as_dict.items()
+        })
         .sort_values(index_cols)
         .set_index(index_cols, verify_integrity=verify_integrity)
         .sort_index()
     )
-
-list_concat = itertools.chain.from_iterable
-T = TypeVar("T")
-V = TypeVar("V")
-def dict_concat(dcts: Iterable[Dict[T, V]], **kwargs) -> Dict[T, V]:
-    return dict(list_concat(dct.items() for dct in dcts))
 
 def set_account_name(
         ts: pd.DataFrame,
@@ -66,7 +90,7 @@ def set_account_name(
         plugin_start: Optional[pd.DataFrame] = None,
         index: Optional[List[str]] = None,
 ) -> pd.DataFrame:
-    if "account_name" in ts:
+    if "account_name" in list(ts.index.names) + list(ts.columns):
         pass
     elif plugin_start is not None:
         ts = ts.assign(
@@ -82,16 +106,24 @@ def set_account_name(
             account_name=account_name
         )
     index = ["account_name"] + (index if index else ["iteration_no"])
-    return (
+    ts = (
         ts
         .reset_index()
         .sort_values(index)
         .set_index(index, verify_integrity=verify_integrity)
         .sort_index()
     )
+    if "plugin_id" in ts.columns:
+        ts = ts.drop(columns=["plugin_id"])
+    return ts
 
-def compute_durations(ts: pd.DataFrame, account_name: str = "", plugin_start: Optional[pd.DataFrame] = None) -> pd.DataFrame:
-    clocks = ["cpu", "wall", "gpu"]
+clocks = ["cpu", "wall", "gpu"]
+
+def compute_durations(
+        ts: pd.DataFrame,
+        account_name: str = "",
+        plugin_start: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
     starts = {
         clock: min(
             ts[f"{clock}_time_start"].min(),
@@ -101,7 +133,7 @@ def compute_durations(ts: pd.DataFrame, account_name: str = "", plugin_start: Op
         if f"{clock}_time_start" in ts
     }
 
-    return ts.assign(
+    ts = ts.assign(
         **dict_concat(
             {
                 f"{clock}_time_start": (ts[f"{clock}_time_start"] - starts[clock]) / 1e6 if clock in starts else 0,
@@ -110,19 +142,36 @@ def compute_durations(ts: pd.DataFrame, account_name: str = "", plugin_start: Op
             }
             for clock in clocks
         ),
-        period=lambda ts: ts["wall_time_start"].diff(),
+        period=ts["wall_time_start"].diff(),
     )
+    for account_name in ts.index.levels[0]:
+        mask = ts.index.droplevel(1) == account_name
+        ts.loc[mask, "period"] = ts.loc[mask, "wall_time_start"].diff()
+    return ts
 
-def split_account(ts: pd.DataFrame, account_name: str, new_account_name: str, bool_mask: pd.Series) -> pd.DataFrame:
+def split_account(
+        ts: pd.DataFrame,
+        account_name: str,
+        new_account_name: str,
+        bool_mask: pd.Series,
+) -> pd.DataFrame:
     # need to reset index to mutate it
     ts = ts.assign(
         account_name=ts.index.droplevel(1),
         iteration_no=ts.index.droplevel(0),
     )
 
-    ts.loc[
-        (ts["account_name"] == account_name) & bool_mask, "account_name"
-    ] = new_account_name
+    index_mask = ts["account_name"] == account_name
+    assert (not verify_integrity) or index_mask.sum()
+    assert (not verify_integrity) or bool_mask.sum()
+    assert (not verify_integrity) or (index_mask & bool_mask).sum()
+
+    with ch_time_block.ctx("change_index", print_start=False):
+        ts["account_name"].mask(
+            cond=index_mask & bool_mask,
+            other=new_account_name,
+            inplace=True,
+        )
 
     # all done mutating index.
     # Restore it.
@@ -134,103 +183,129 @@ def split_account(ts: pd.DataFrame, account_name: str, new_account_name: str, bo
         .sort_index()
     )
 
-def concat_accounts(ts: pd.DataFrame, account_name_a: str, account_name_b: str, account_name_out: str) -> pd.DataFrame:
-    # Keep in mind a merge won't work, because there could be many:many
-    # For example, concat-ing skip to iterations by iteration_no
-
+def concat_accounts(
+        ts: pd.DataFrame,
+        account_name_a: str,
+        account_name_b: str,
+        account_name_out: str,
+) -> pd.DataFrame:
     new_rows = (
-        (
-            pd.concat([
-                ts.loc[account_name_a].reset_index(),
-                ts.loc[account_name_b].reset_index(),
-            ])
-            .groupby(["iteration_no"])
-            .agg(dict(list_concat(
-                {
-                    f"{clock}_time_duration": "sum",
-                    f"{clock}_time_start": "min",
-                    f"{clock}_time_stop" : "max",
-                }.items()
-                for clock in ["cpu", "gpu", "wall"]
-            )))
-            .assign(
-                account_name=account_name_out,
-            )
-            .reset_index()
-            .sort_values(["account_name", "iteration_no"])
-            .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
-            .sort_index()
+        pd.merge(
+            ts.loc[account_name_a].reset_index(),
+            ts.loc[account_name_b].reset_index(),
+            on="iteration_no",
+            suffixes=("_a", "_b"),
         )
     )
-
-    return pd.concat([
-        ts.drop(account_name_a, level=0).drop(account_name_b, level=0),
-        new_rows,
-    ], verify_integrity=verify_integrity).sort_index()
-
-def get_data(metrics_path: Path) -> None:
-    plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
-    threadloop_iteration   = read_illixr_table(metrics_path, "threadloop_iteration"    , ["plugin_id", "iteration_no"])
-    threadloop_skip        = read_illixr_table(metrics_path, "threadloop_skip"         , ["plugin_id", "iteration_no", "skip_no"])
-    switchboard_callback   = read_illixr_table(metrics_path, "switchboard_callback"    , ["plugin_id", "iteration_no"])
-    switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
-    switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
-    timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
-    imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
-
-    # This is an integer in SQLite, because no bool in SQLite.
-    # Convert it to a bool.
-    imu_cam["has_camera"]  = imu_cam["has_camera"] == 1
-
-    for row in switchboard_topic_stop.itertuples():
-        if row.unprocessed / max(1, row.unprocessed + row.processed) > 0.03:
-            warnings.warn(f"""
-{row.Index} has many ({row.unprocessed} / {(row.unprocessed + row.processed)}) unprocessed events when ILLIXR terminated. Your hardware might be oversubscribed.
-""".strip(), UserWarning)
-
-    # stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
-    # stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_duration"])
-
-    threadloop_skip = (
-        set_account_name(compute_durations(threadloop_skip), " skip", plugin_name, ["iteration_no", "skip_no"])
-        .groupby(level=[0, 1])
-        .agg(dict(list_concat(
-            {
-                f"{clock}_time_duration": "sum",
-                f"{clock}_time_start": "min",
-                f"{clock}_time_stop" : "max",
-            }.items()
-            for clock in ["cpu", "gpu", "wall"]
-        )))
+    new_rows = (
+        new_rows
+        .assign(
+            **dict_concat(
+                {
+                    f"{clock}_time_duration": new_rows[[f"{clock}_time_duration_a", f"{clock}_time_duration_b"]].sum(axis=1),
+                    f"{clock}_time_start"   : new_rows[[f"{clock}_time_start_a"   , f"{clock}_time_start_b"   ]].min(axis=1),
+                    f"{clock}_time_stop"    : new_rows[[f"{clock}_time_stop_a"    , f"{clock}_time_stop_b"    ]].max(axis=1),
+                }
+                for clock in ["cpu", "gpu", "wall"]
+            ),
+            account_name=account_name_out,
+            period=lambda df: df["wall_time_start"].diff(),
+        )
     )
-    ts = pd.concat([
-        compute_durations(pd.concat([
+    new_rows = (
+        new_rows
+        .drop(columns=[col for col in new_rows.columns if col.endswith("_a") or col.endswith("_b")])
+        .reset_index(drop=True)
+        .sort_values(["account_name", "iteration_no"])
+        .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
+        .sort_index()
+    )
+
+    with ch_time_block.ctx("concat", print_start=False):
+        return pd.concat([
+            ts.drop(account_name_a, level=0).drop(account_name_b, level=0),
+            new_rows,
+        ], verify_integrity=verify_integrity).sort_index()
+
+def rename_accounts(ts: pd.DataFrame, renames: Dict[str, str]) -> pd.DataFrame:
+    # need to reset index to mutate it
+    ts = ts.assign(
+        account_name=ts.index.droplevel(1),
+        iteration_no=ts.index.droplevel(0),
+    )
+
+    for old_account_name, new_account_name in renames.items():
+        ts.loc[ts["account_name"] == old_account_name, "account_name"] = new_account_name
+
+    return (
+        ts
+        .reset_index(drop=True)
+        .sort_values(["account_name", "iteration_no"])
+        .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
+        .sort_index()
+    )
+
+@ch_time_block.decor(print_start=False)
+def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
+    with ch_time_block.ctx("load sqlite", print_start=False):
+        plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
+        threadloop_iteration   = read_illixr_table(metrics_path, "threadloop_iteration"    , ["plugin_id", "iteration_no"])
+        switchboard_callback   = read_illixr_table(metrics_path, "switchboard_callback"    , ["plugin_id", "iteration_no"])
+        switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
+        switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
+        timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
+        imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
+
+        # This is an integer in SQLite, because no bool in SQLite.
+        # Convert it to a bool.
+        imu_cam["has_camera"]  = imu_cam["has_camera"] == 1
+
+    with ch_time_block.ctx("load csv", print_start=False):
+        stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
+        # stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_duration"])
+        thread_ids = read_illixr_csv(metrics_path, "thread", ["thread_id"], ["name", "sub_name"])
+
+    switchboard_topic_stop = switchboard_topic_stop.assign(
+        completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
+    )
+    for row in switchboard_topic_stop.itertuples():
+        if row.completion < 0.95 and row.unprocessed > 0:
+            warnings.warn("\n".join([
+                f"{row.Index} has many ({row.unprocessed} / {(row.unprocessed + row.processed)}) unprocessed events when ILLIXR terminated.",
+                "Your hardware resources might be oversubscribed.",
+            ]) , UserWarning)
+
+    with ch_time_block.ctx("concat data", print_start=False):
+        ts = compute_durations(pd.concat([
             set_account_name(threadloop_iteration, " iter", plugin_name),
             set_account_name(switchboard_callback, " cb", plugin_name),
-            set_account_name(switchboard_check_qs, "runtime_check qs"),
-            # set_account_name(stdout_cpu_timer),
-        ])),
-        threadloop_skip,
-    ]).sort_index()
+            set_account_name(switchboard_check_qs, "runtime check_qs"),
+            set_account_name(stdout_cpu_timer),
+            set_account_name(timewarp_gpu, "timewarp_gl gpu"),
+        ])).sort_index()
 
-    for account_name in set(threadloop_skip.index.droplevel(1)):
-        account_name = account_name.split(" ")[0]
-        ts = concat_accounts(ts, f"{account_name} iter", f"{account_name} skip", account_name)
+    with ch_time_block.ctx("split accounts", print_start=False):
+        bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
 
-    bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
+        ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
+        ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam imu", ~bool_mask_cam)
 
-    ts = split_account(ts, "offline_imu_cam", "offline_imu_cam cam",  bool_mask_cam)
-    ts = split_account(ts, "offline_imu_cam", "offline_imu_cam imu", ~bool_mask_cam)
+        ts = split_account(ts, "slam2 cb", "slam2 cb cam",  bool_mask_cam)
+        ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
 
-    ts = split_account(ts, "slam2 cb", "slam2 cb cam",  bool_mask_cam)
-    ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
+    with ch_time_block.ctx("concat accounts", print_start=False):
+        ts = concat_accounts(ts, "offline_imu_cam cam", "slam2 cb cam", "OpenVINS Camera")
+        ts = concat_accounts(ts, "offline_imu_cam imu", "slam2 cb imu", "OpenVINS IMU")
+        ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
 
-    ts = concat_accounts(ts, "offline_imu_cam cam", "slam2 cb cam", "camera")
-    ts = concat_accounts(ts, "offline_imu_cam imu", "slam2 cb imu", "IMU")
-    # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "timewarp")
+    with ch_time_block.ctx("rename accounts", print_start=False):
+        ts = rename_accounts(ts, {
+            "runtime check_qs": "Runtime",
+            "gldemo iter": "Application (GL Demo)",
+        })
 
     summaries = ts.groupby("account_name").agg({
-        "period"       : ["mean", "std"],
+        "period"            : ["mean", "std"],
         "cpu_time_duration" : ["mean", "std", "sum"],
         "wall_time_duration": ["mean", "std", "sum"],
         "gpu_time_duration" : ["mean", "std", "sum"],
@@ -242,15 +317,39 @@ def get_data(metrics_path: Path) -> None:
 
     summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-    return ts, summaries
+    return ts, summaries, switchboard_topic_stop, thread_ids
 
-ts, summaries = get_data(Path("..") / "metrics")
+ts, summaries, switchboard_topic_stop, thread_ids = get_data(Path("..") / "metrics")
 
 output_path = Path("../output")
 output_path.mkdir(exist_ok=True)
 with (output_path / "account_summaries.md").open("w") as f:
-    f.write(summaries.to_markdown())
-    f.write("\n\nAll times are in milliseconds unless otherwise mentioned.")
+    f.write("# Summaries\n\n")
+    columns = ["count"] + [col for col in summaries.columns if col != "count"]
+    floatfmt = ["", ".0f", ".1f", ".1f"] + list_concat(["e", "e", "e"] for clock in clocks)
+    f.write(summaries[columns].to_markdown(floatfmt=floatfmt))
+    f.write("\n\n")
+    f.write("# Thread IDs (of long-running threads)\n\n")
+    f.write(thread_ids.sort_values(["name", "sub_name"]).to_markdown())
+    f.write("\n\n")
+    f.write("# Switchboard topic stops\n\n")
+    f.write(switchboard_topic_stop.to_markdown(floatfmt=["", ".0f", ".0f", ".2f"]))
+    f.write("\n\n")
+    f.write("# Notes\n\n")
+    f.write("- All times are in milliseconds unless otherwise mentioned.\n")
+    f.write("- Total wall runtime = {:.1f} sec\n".format(
+        (ts["wall_time_stop"].max() - ts["wall_time_start"].min()) / 1e3
+    ))
+    f.write("- Next are the first and last few rows of each account.")
+    f.write("\n\n")
+    account_names = ts.index.levels[0]
+    columns = ["period"] + [col for col in ts.columns if col != "period"]
+    for account_name in account_names:
+        f.write(f"# {account_name}\n\n")
+        df = ts.loc[account_name]
+        f.write(
+            pd.concat([df.head(), df.tail()]).to_markdown())
+        f.write("\n\n")
 
 import sys
 sys.exit(0)
@@ -330,14 +429,14 @@ def nice_histogram(ys: np.array, label: str, title: str, account: str, path: Pat
     fig.savefig(path / f"{account.replace(' ', '-')}.png")
     plt.close(fig)
 
-with ch_time_block.ctx("Plot histograms", print_start=False):
-    cpu_duration_hist_path = output_path / "cpu_duration_hists"
-    period_hist_path = output_path / "period_hists"
-    wall_duration_hist_path = output_path / "wall_duration_hists"
-    gpu_duration_hist_path = output_path / "gpu_duration_hists"
-    gpu_overhead_hist_path = output_path / "gpu_overhead_hists"
-    utilization_hist_path = output_path / "utilization_hists"
+cpu_duration_hist_path = output_path / "cpu_duration_hists"
+period_hist_path = output_path / "period_hists"
+wall_duration_hist_path = output_path / "wall_duration_hists"
+gpu_duration_hist_path = output_path / "gpu_duration_hists"
+gpu_overhead_hist_path = output_path / "gpu_overhead_hists"
+utilization_hist_path = output_path / "utilization_hists"
 
+with ch_time_block.ctx("Plot histograms", print_start=False):
     for path in [
             cpu_duration_hist_path,
             wall_duration_hist_path,
