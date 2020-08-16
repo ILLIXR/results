@@ -26,7 +26,7 @@ def list_concat(lsts: Iterable[List[T]]) -> List[T]:
 def dict_concat(dcts: Iterable[Dict[T, V]], **kwargs) -> Dict[T, V]:
     return dict(it_concat(dct.items() for dct in dcts), **kwargs)
 
-verify_integrity = False
+verify_integrity = True
 
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
     db_path = metrics_path / (table_name + ".sqlite")
@@ -197,12 +197,20 @@ def concat_accounts(
 ) -> pd.DataFrame:
     new_rows = (
         pd.merge(
-            ts.loc[account_name_a].reset_index(),
-            ts.loc[account_name_b].reset_index(),
-            on="iteration_no",
+            ts.loc[account_name_a],
+            ts.loc[account_name_b],
+            left_index=True ,
+            right_index=True,
             suffixes=("_a", "_b"),
         )
     )
+    l_a = len(ts.loc[account_name_a])
+    l_b = len(ts.loc[account_name_b])
+    l_ab = len(new_rows)
+    if l_a < l_b * 0.95 or l_b < l_a * 0.95:
+        raise UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows), despite row-count mismatch")
+    if l_ab < l_a * 0.95:
+        raise UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows) have only {l_ab} rows in common")
     new_rows = (
         new_rows
         .assign(
@@ -221,8 +229,8 @@ def concat_accounts(
     new_rows = (
         new_rows
         .drop(columns=[col for col in new_rows.columns if col.endswith("_a") or col.endswith("_b")])
-        .reset_index(drop=True)
         .sort_values(["account_name", "iteration_no"])
+        .reset_index()
         .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
         .sort_index()
     )
@@ -251,6 +259,29 @@ def rename_accounts(ts: pd.DataFrame, renames: Dict[str, str]) -> pd.DataFrame:
         .sort_index()
     )
 
+def sub_accounts(ts: pd.DataFrame, account_a: str, account_b: str) -> pd.DataFrame:
+    ts = ts.copy()
+    ts.loc[account_a, "cpu_time_duration"] -= ts.loc[account_b, "cpu_time_duration"]
+    return ts
+
+def reindex(ts: pd.DataFrame, accounts: Optional[List[str]] = None) -> pd.DataFrame:
+    ts = (
+        ts
+        .reset_index()
+    )
+    accounts = accounts if accounts is not None else ts["account_name"].unique()
+    for account_name in accounts:
+        account_mask = ts["account_name"] == account_name
+        ts.loc[account_mask, "iteration_no"] = range(account_mask.sum())
+
+    return (
+        ts
+        .reset_index(drop=True)
+        .sort_values(["account_name", "iteration_no"])
+        .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
+        .sort_index()
+    )
+
 @ch_time_block.decor(print_start=False)
 def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
     with ch_time_block.ctx("load sqlite", print_start=False):
@@ -261,6 +292,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
         timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
         imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
+        camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
 
         # This is an integer in SQLite, because no bool in SQLite.
         # Convert it to a bool.
@@ -286,10 +318,12 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             set_account_name(threadloop_iteration, " iter", plugin_name),
             set_account_name(switchboard_callback, " cb", plugin_name),
             set_account_name(switchboard_check_qs, "runtime check_qs"),
-            set_account_name(stdout_cpu_timer),
+            reindex(set_account_name(stdout_cpu_timer)),
             set_account_name(timewarp_gpu, "timewarp_gl gpu"),
+            set_account_name(camera_cvtfmt, "camera_cvtfmt"),
         ])).sort_index()
 
+    with ch_time_block.ctx("misc", print_start=False):
         account_names = ts.index.levels[0]
         thread_ids["missing_cpu_time_usage"] = np.NaN
         thread_ids["total_cpu_time_usage"] = np.NaN
@@ -318,23 +352,50 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
                 thread_ids.loc[thread_ids["sub_name"] == thread_name, "missing_cpu_time_usage"] = stop - start - used
 
     with ch_time_block.ctx("split accounts", print_start=False):
+
+        if "offline_imu_cam iter" in ts.index.levels[0]:
+            ts = sub_accounts(ts, "offline_imu_cam iter", "camera_cvtfmt")
+        else:
+            ts = sub_accounts(ts, "zed_camera_thread iter", "camera_cvtfmt")
+
         bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
 
-        ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
-        ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam imu", ~bool_mask_cam)
+        has_zed = "offline_imu_cam iter" in ts.index.levels[0]
+        has_gldemo = "gldemo iter" in ts.index.levels[0]
+        if not has_zed:
+            ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
+            ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam imu", ~bool_mask_cam)
+            assert "offline_imu_cam" not in ts.index.levels[0]
 
         ts = split_account(ts, "slam2 cb", "slam2 cb cam",  bool_mask_cam)
         ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
+        ts = reindex(ts, ["slam2 cb cam"])
 
     with ch_time_block.ctx("concat accounts", print_start=False):
-        ts = concat_accounts(ts, "offline_imu_cam cam", "slam2 cb cam", "OpenVINS Camera")
-        ts = concat_accounts(ts, "offline_imu_cam imu", "slam2 cb imu", "OpenVINS IMU")
         ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
+        ts = concat_accounts(ts, "slam2 hist l", "slam2 cb cam", "slam2 cb cam")
+        ts = concat_accounts(ts, "slam2 hist r", "slam2 cb cam", "slam2 cb cam")
+        ts = concat_accounts(ts, "slam2 matching l", "slam2 cb cam", "slam2 cb cam")
+        ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
+        ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
+        ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
 
     with ch_time_block.ctx("rename accounts", print_start=False):
         ts = rename_accounts(ts, {
             "runtime check_qs": "Runtime",
-            "gldemo iter": "Application (GL Demo)",
+            **({
+                "gldemo iter": "Application (GL Demo)"
+            } if has_gldemo else {}),
+            "camera_cvtfmt": "Camera Cvtfmt",
+            "slam2 cb imu": "OpenVINS IMU",
+            "slam2 cb cam": "OpenVINS Camera (incomplete)",
+            **({
+                "offline_imu_cam cam": "Camera loading",
+                "offline_imu_cam imu": "IMU loading",
+            } if not has_zed else {
+                "zed_camera_thread": "ZED Camera (part)",
+                "zed_imu_thread": "ZED IMU (part)",
+            })
         })
 
     summaries = ts.groupby("account_name").agg({
