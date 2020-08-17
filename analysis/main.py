@@ -208,9 +208,9 @@ def concat_accounts(
     l_b = len(ts.loc[account_name_b])
     l_ab = len(new_rows)
     if l_a < l_b * 0.95 or l_b < l_a * 0.95:
-        raise UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows), despite row-count mismatch")
+        warnings.warn(UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows), despite row-count mismatch"))
     if l_ab < l_a * 0.95:
-        raise UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows) have only {l_ab} rows in common")
+        warnings.warn(UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows) have only {l_ab} rows in common"))
     new_rows = (
         new_rows
         .assign(
@@ -360,7 +360,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
 
         bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
 
-        has_zed = "offline_imu_cam iter" in ts.index.levels[0]
+        has_zed = "zed_camera_thread iter" in ts.index.levels[0]
         has_gldemo = "gldemo iter" in ts.index.levels[0]
         if not has_zed:
             ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
@@ -468,7 +468,7 @@ with ch_time_block.ctx("Plot bar chart of CPU time share", print_start=False):
     # I derived this from the Central Limit Theorem
     # sigma_sum^2 = sigma_individ^2 / sqrt(n).
     # sigma_sum = sigma_individ / n^(1/4)
-    # 
+    #
     summaries["cpu_duration_std"] = summaries["cpu_duration_std"] * summaries["count"]**(3/4) / total_cpu_time
 
     summaries2_share = collections.defaultdict(lambda: 0)
