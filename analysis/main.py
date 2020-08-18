@@ -1,3 +1,4 @@
+
 import collections
 import itertools
 from pathlib import Path
@@ -66,23 +67,26 @@ def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str],
                     df_as_dict[col].append(match.group(col))
             elif line.startswith(record_name + ","):
                 close_miss += 1
-    hits = len(df_as_dict[index_cols[0]])
-    if hits / (hits + close_miss) < 0.95:
+    hits = len(df_as_dict[cols[0]])
+    if hits + close_miss != 0 and hits / (hits + close_miss) < 0.95:
         warnings.warn(UserWarning(f"Many ({close_miss} / {close_miss + hits}) lines of {record_name} were spliced incorrectly."))
 
-    return (
-        pd.DataFrame.from_dict({
-            key: (
-                map(int, col) if all(map(is_int, col)) else
-                map(float, col) if all(map(is_float, col)) else
-                col
-            )
-            for key, col in df_as_dict.items()
-        })
-        .sort_values(index_cols)
-        .set_index(index_cols, verify_integrity=verify_integrity)
-        .sort_index()
-    )
+    df = pd.DataFrame.from_dict({
+        key: (
+            map(int, col) if all(map(is_int, col)) else
+            map(float, col) if all(map(is_float, col)) else
+            col
+        )
+        for key, col in df_as_dict.items()
+    })
+    if index_cols:
+        df = (
+            df
+            .sort_values(index_cols)
+            .set_index(index_cols, verify_integrity=verify_integrity)
+            .sort_index()
+        )
+    return df
 
 def set_account_name(
         ts: pd.DataFrame,
@@ -211,20 +215,17 @@ def concat_accounts(
         raise UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows), despite row-count mismatch")
     if l_ab < l_a * 0.95:
         raise UserWarning(f"Merging {account_name_a} ({l_a} rows) with {account_name_b} ({l_b} rows) have only {l_ab} rows in common")
-    new_rows = (
-        new_rows
-        .assign(
-            **dict_concat(
-                {
-                    f"{clock}_time_duration": new_rows[[f"{clock}_time_duration_a", f"{clock}_time_duration_b"]].sum(axis=1),
-                    f"{clock}_time_start"   : new_rows[[f"{clock}_time_start_a"   , f"{clock}_time_start_b"   ]].min(axis=1),
-                    f"{clock}_time_stop"    : new_rows[[f"{clock}_time_stop_a"    , f"{clock}_time_stop_b"    ]].max(axis=1),
-                }
-                for clock in ["cpu", "gpu", "wall"]
-            ),
-            account_name=account_name_out,
-            period=lambda df: df["wall_time_start"].diff(),
-        )
+    new_rows = new_rows.assign(
+        **dict_concat(
+            {
+                f"{clock}_time_duration": new_rows[[f"{clock}_time_duration_a", f"{clock}_time_duration_b"]].sum(axis=1),
+                f"{clock}_time_start"   : new_rows[[f"{clock}_time_start_a"   , f"{clock}_time_start_b"   ]].min(axis=1),
+                f"{clock}_time_stop"    : new_rows[[f"{clock}_time_stop_a"    , f"{clock}_time_stop_b"    ]].max(axis=1),
+            }
+            for clock in ["cpu", "gpu", "wall"]
+        ),
+        account_name=account_name_out,
+        period=lambda df: df["wall_time_start"].diff(),
     )
     new_rows = (
         new_rows
@@ -301,7 +302,49 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
     with ch_time_block.ctx("load csv", print_start=False):
         stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
         # stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_duration"])
-        thread_ids = read_illixr_csv(metrics_path, "thread", ["thread_id"], ["name", "sub_name"])
+        thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
+        stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
+        stdout_cpu_timer2 = (
+            compute_durations(stdout_cpu_timer2)
+        )
+        stdout_cpu_timer2 = (
+            stdout_cpu_timer2
+            .reset_index()
+            .assign(
+                iteration_no=lambda df: df["iteration_no"].mask(df["iteration_no"] == "null", "-1").astype(int)
+            )
+            .sort_values(["iteration_no", "thread_id", "sub_iteration_no"])
+            .set_index(["iteration_no", "thread_id", "sub_iteration_no"], verify_integrity=verify_integrity)
+            .sort_index()
+        )
+        print(stdout_cpu_timer2)
+        print(stdout_cpu_timer2.index.levels[0].unique())
+        stdout_cpu_timer2 = (stdout_cpu_timer2
+            .groupby(level=[0])
+            # just groupby iteration_no, coalescing thread_id and sub_iteration_no
+            .agg({
+                **dict_concat(
+                    {
+                        f"{clock}_time_duration": sum,
+                        f"{clock}_time_start"   : min,
+                        f"{clock}_time_stop"    : max,
+                    }
+                    for clock in ["cpu", "gpu", "wall"]
+                ),
+            })
+            .assign(
+                account_name="opencv",
+                period=lambda df: df["wall_time_start"].diff(),
+            )
+        )
+        print(stdout_cpu_timer2)
+        stdout_cpu_timer2 = (stdout_cpu_timer2
+            .reset_index()
+            .sort_values(["account_name", "iteration_no"])
+            .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
+            .sort_index()
+        )
+        print(stdout_cpu_timer2)
 
     switchboard_topic_stop = switchboard_topic_stop.assign(
         completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
@@ -322,6 +365,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             set_account_name(timewarp_gpu, "timewarp_gl gpu"),
             set_account_name(camera_cvtfmt, "camera_cvtfmt"),
         ])).sort_index()
+        ts = pd.concat([ts, stdout_cpu_timer2]).sort_index()
 
     with ch_time_block.ctx("misc", print_start=False):
         account_names = ts.index.levels[0]
@@ -379,6 +423,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
         ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
         ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
+        ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
 
     with ch_time_block.ctx("rename accounts", print_start=False):
         ts = rename_accounts(ts, {
@@ -386,9 +431,9 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             **({
                 "gldemo iter": "Application (GL Demo)"
             } if has_gldemo else {}),
-            "camera_cvtfmt": "Camera Cvtfmt",
+            # "camera_cvtfmt": "Camera convert-format",
             "slam2 cb imu": "OpenVINS IMU",
-            "slam2 cb cam": "OpenVINS Camera (incomplete)",
+            "slam2 cb cam": "OpenVINS Camera (incl. OpenCV)",
             **({
                 "offline_imu_cam cam": "Camera loading",
                 "offline_imu_cam imu": "IMU loading",
