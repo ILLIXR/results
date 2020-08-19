@@ -127,6 +127,7 @@ def compute_durations(
         ts: pd.DataFrame,
         account_name: str = "",
         plugin_start: Optional[pd.DataFrame] = None,
+        fix_periods: bool = True,
 ) -> pd.DataFrame:
     ts = ts.assign(**dict_concat(
         {
@@ -160,9 +161,10 @@ def compute_durations(
         ),
         period=ts["wall_time_start"].diff(),
     )
-    for account_name in ts.index.levels[0]:
-        mask = ts.index.droplevel(1) == account_name
-        ts.loc[mask, "period"] = ts.loc[mask, "wall_time_start"].diff()
+    if fix_periods:
+        for account_name in ts.index.levels[0]:
+            mask = ts.index.droplevel(1) == account_name
+            ts.loc[mask, "period"] = ts.loc[mask, "wall_time_start"].diff()
     return ts
 
 def split_account(
@@ -314,8 +316,9 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
         stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
         stdout_cpu_timer2 = (
-            compute_durations(stdout_cpu_timer2)
+            compute_durations(stdout_cpu_timer2, fix_periods=False)
         )
+        print("test test test")
         stdout_cpu_timer2 = (
             stdout_cpu_timer2
             .reset_index()
