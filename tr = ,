@@ -1,0 +1,51 @@
+[1mdiff --git a/analysis/main.py b/analysis/main.py[m
+[1mindex cd2c4a4..8acdde0 100644[m
+[1m--- a/analysis/main.py[m
+[1m+++ b/analysis/main.py[m
+[36m@@ -128,6 +128,14 @@[m [mdef compute_durations([m
+         account_name: str = "",[m
+         plugin_start: Optional[pd.DataFrame] = None,[m
+ ) -> pd.DataFrame:[m
+[32m+[m[32m    ts = ts.assign(**dict_concat([m
+[32m+[m[32m        {[m
+[32m+[m[32m            f"{clock}_time_start": pd.to_numeric(ts[f"{clock}_time_start"]),[m
+[32m+[m[32m            f"{clock}_time_stop" : pd.to_numeric(ts[f"{clock}_time_stop" ]),[m
+[32m+[m[32m        }[m
+[32m+[m[32m        for clock in clocks[m
+[32m+[m[32m    ))[m
+[32m+[m
+     starts = {[m
+         clock: min([m
+             ts[f"{clock}_time_start"].min(),[m
+[36m@@ -137,15 +145,13 @@[m [mdef compute_durations([m
+         if f"{clock}_time_start" in ts[m
+     }[m
+ [m
+[31m-    ts = ts.assign([m
+[31m-        **dict_concat([m
+[31m-            {[m
+[31m-                f"{clock}_time_start": (ts[f"{clock}_time_start"] - starts[clock]) / 1e6 if clock in starts else 0,[m
+[31m-                f"{clock}_time_stop" : (ts[f"{clock}_time_stop" ] - starts[clock]) / 1e6 if clock in starts else 0,[m
+[31m-            }[m
+[31m-            for clock in clocks[m
+[31m-        )[m
+[31m-    )[m
+[32m+[m[32m    ts = ts.assign(**dict_concat([m
+[32m+[m[32m        {[m
+[32m+[m[32m            f"{clock}_time_start": (ts[f"{clock}_time_start"] - starts[clock]) / 1e6 if clock in starts else 0,[m
+[32m+[m[32m            f"{clock}_time_stop" : (ts[f"{clock}_time_stop" ] - starts[clock]) / 1e6 if clock in starts else 0,[m
+[32m+[m[32m        }[m
+[32m+[m[32m        for clock in clocks[m
+[32m+[m[32m    ))[m
+     ts = ts.assign(**dict_concat([m
+             {[m
+                 f"{clock}_time_duration": ts[f"{clock}_time_stop"] - ts[f"{clock}_time_start"] if clock in starts else 0,[m
+[36m@@ -435,6 +441,8 @@[m [mdef get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:[m
+                 "gldemo iter": "Application (GL Demo)"[m
+             } if has_gldemo else {}),[m
+             # "camera_cvtfmt": "Camera convert-format",[m
+[32m+[m[32m            "audio_pipeline": "Audio Encoding",[m
+[32m+[m[32m            "audio_decoding": "Audio Decoding",[m
+             "slam2 cb imu": "OpenVINS IMU",[m
+             "slam2 cb cam": "OpenVINS Camera (incl. OpenCV)",[m
+             **({[m
