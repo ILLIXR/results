@@ -40,10 +40,10 @@ def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]
     )
 
 def is_int(string: str) -> bool:
-    return bool(re.match(r"\d+", string))
+    return bool(re.match(r"^\d+$", string))
 
 def is_float(string: str) -> bool:
-    return bool(re.match(r"\d+.\d+", string))
+    return bool(re.match(r"^\d+.\d+(e[+-]\d+)$", string))
 
 def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str], other_cols: List[str]) -> pd.DataFrame:
     cols = index_cols + other_cols
@@ -135,6 +135,7 @@ def compute_durations(
             f"{clock}_time_stop" : pd.to_numeric(ts[f"{clock}_time_stop" ]),
         }
         for clock in clocks
+        if f"{clock}_time_start" in ts
     ))
 
     starts = {
@@ -311,14 +312,13 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         imu_cam["has_camera"]  = imu_cam["has_camera"] == 1
 
     with ch_time_block.ctx("load csv", print_start=False):
-        stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
-        # stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_duration"])
         thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
+        stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
+        stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_duration"])
         stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
         stdout_cpu_timer2 = (
             compute_durations(stdout_cpu_timer2, fix_periods=False)
         )
-        print("test test test")
         stdout_cpu_timer2 = (
             stdout_cpu_timer2
             .reset_index()
@@ -329,8 +329,6 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             .set_index(["iteration_no", "thread_id", "sub_iteration_no"], verify_integrity=verify_integrity)
             .sort_index()
         )
-        print(stdout_cpu_timer2)
-        print(stdout_cpu_timer2.index.levels[0].unique())
         stdout_cpu_timer2 = (stdout_cpu_timer2
             .groupby(level=[0])
             # just groupby iteration_no, coalescing thread_id and sub_iteration_no
@@ -349,14 +347,12 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
                 period=lambda df: df["wall_time_start"].diff(),
             )
         )
-        print(stdout_cpu_timer2)
         stdout_cpu_timer2 = (stdout_cpu_timer2
             .reset_index()
             .sort_values(["account_name", "iteration_no"])
             .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
             .sort_index()
         )
-        print(stdout_cpu_timer2)
 
     switchboard_topic_stop = switchboard_topic_stop.assign(
         completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
@@ -408,11 +404,6 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
                 thread_ids.loc[thread_ids["sub_name"] == thread_name, "missing_cpu_time_usage"] = stop - start - used
 
     with ch_time_block.ctx("split accounts", print_start=False):
-
-        if "offline_imu_cam iter" in ts.index.levels[0]:
-            ts = sub_accounts(ts, "offline_imu_cam iter", "camera_cvtfmt")
-        else:
-            ts = sub_accounts(ts, "zed_camera_thread iter", "camera_cvtfmt")
 
         bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
 
