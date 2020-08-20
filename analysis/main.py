@@ -242,7 +242,6 @@ def concat_accounts(
         .assign(
             **dict_concat(
                 {
-                    f"{clock}_time_duration": new_rows[[f"{clock}_time_duration_a", f"{clock}_time_duration_b"]].sum(axis=1),
                     f"{clock}_time_start"   : new_rows[[f"{clock}_time_start_a"   , f"{clock}_time_start_b"   ]].min(axis=1),
                     f"{clock}_time_stop"    : new_rows[[f"{clock}_time_stop_a"    , f"{clock}_time_stop_b"    ]].max(axis=1),
                 }
@@ -250,6 +249,14 @@ def concat_accounts(
             ),
             account_name=account_name_out,
             period=lambda df: df["wall_time_start"].diff(),
+        )
+    )
+    new_rows = (
+        new_rows
+        .assign(
+            cpu_time_duration=new_rows[f"cpu_time_duration_a"] + new_rows[f"cpu_time_duration_b"],
+            wall_time_duration=new_rows[f"wall_time_stop_b"] - new_rows[f"wall_time_start_a"],
+            gpu_time_duration=new_rows[f"gpu_time_duration_a"] + new_rows[f"gpu_time_duration_b"],
         )
     )
     new_rows = (
