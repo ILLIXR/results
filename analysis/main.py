@@ -11,6 +11,7 @@ import warnings
 
 from tqdm import tqdm
 import charmonium.time_block as ch_time_block
+import charmonium.cache as ch_cache
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -315,6 +316,7 @@ def reindex(ts: pd.DataFrame, accounts: Optional[List[str]] = None) -> pd.DataFr
         .sort_index()
     )
 
+@ch_cache.decor(ch_cache.FileStore.create("../metrics"))
 @ch_time_block.decor(print_start=False)
 def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
     with ch_time_block.ctx("load sqlite", print_start=False):
@@ -503,6 +505,9 @@ with (output_path / "account_summaries.md").open("w") as f:
     floatfmt = ["", ".0f", ".1f", ".1f"] + list_concat(["e", "e", "e"] for clock in clocks)
     f.write(summaries[columns].to_markdown(floatfmt=floatfmt))
     f.write("\n\n")
+    f.write("# Totals\n\n")
+    f.write(summaries[["cpu_time_duration_sum", "gpu_time_duration_sum"]].sum().to_markdown())
+    f.write("\n\n")
     f.write("# Thread IDs (of long-running threads)\n\n")
     f.write(thread_ids.sort_values(["name", "sub_name"]).to_markdown())
     f.write("\n\n")
@@ -524,31 +529,51 @@ with (output_path / "account_summaries.md").open("w") as f:
         f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
         f.write("\n\n")
 
-    f, (ax, ax2, ax3) = plt.subplots(3, sharex=True)
+    # Stacked graphs
+    f, ax = plt.subplots(len(account_names), sharex=True)
     f.tight_layout(pad=2.0)
     plt.rcParams.update({'font.size': 8})
-
     # plot the same data on both axes
-    ax.plot(ts.loc["OpenVINS Camera", "cpu_time_stop"], ts.loc["OpenVINS Camera", "cpu_time_duration"], 'tab:orange', linewidth=.5)
-    ax.set_title("OpenVINS Camera CPU Time Timeseries")
-    ax.set(ylabel='CPU Time (ms)')
-
-    ax2.plot(ts.loc["OpenVINS IMU", "cpu_time_stop"], ts.loc["OpenVINS IMU", "cpu_time_duration"], 'tab:green', linewidth=.5)
-    ax2.set_title("OpenVINS IMU CPU Time Timeseries")
-    ax2.set(ylabel='CPU Time (ms)')
-
-    if "debugview cb" in account_names:
-        ax3.plot(ts.loc["debugview cb", "cpu_time_stop"], ts.loc["debugview cb", "cpu_time_duration"], 'tab:blue', linewidth=.5)
-        ax3.set_title("Debugview CB CPU Time Timeseries")
-        ax3.set(ylabel='CPU Time (ms)')
-
+    for i, account_name in enumerate(account_names):
+        ax[i].plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"], 'tab:orange', linewidth=.5)
+        # ax[i].set_title(f"{account_name} CPU Time Timeseries")
+        # ax[i].set(ylabel='CPU Time (ms)')
     plt.xlabel("Timestamp (ms)")
-    plt.savefig("test.png")
+    plt.savefig(output_path / "stacked.png")
+
+    # Overlayed graphs
+    f = plt.figure()
+    f.tight_layout(pad=2.0)
+    plt.rcParams.update({'font.size': 8})
+    # plot the same data on both axes
+    ax = f.gca()
+    for i, account_name in enumerate(account_names):
+        ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
+        ax.set_title(f"{account_name} CPU Time Timeseries")
+        ax.set(ylabel='CPU Time (ms)')
+    plt.xlabel("Timestamp (ms)")
+    plt.savefig(output_path / "overlayed.png")
+    # import IPython; IPython.embed()
+
+
+    # Individual graphs
+    ts_dir = output_path / "ts"
+    ts_dir.mkdir()
+    for i, account_name in enumerate(account_names):
+        f = plt.figure()
+        f.tight_layout(pad=2.0)
+        plt.rcParams.update({'font.size': 8})
+        # plot the same data on both axes
+        ax = f.gca()
+        ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
+        ax.set_title(f"{account_name} CPU Time Timeseries")
+        ax.set(ylabel='CPU Time (ms)')
+        plt.xlabel("Timestamp (ms)")
+        plt.savefig(ts_dir / f"{account_name}.png")
 
     # import IPython; IPython.embed()
 
-    # Add here 
-    print(summaries["cpu_time_duration_sum"].to_csv())
+    # print(summaries["cpu_time_duration_sum"].to_csv())
 
 import sys
 sys.exit(0)

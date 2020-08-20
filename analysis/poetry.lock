@@ -17,6 +17,14 @@ version = "0.2.0"
 
 [[package]]
 category = "main"
+description = "Provides a decorator for caching a function and an equivalent command-line util."
+name = "charmonium.cache"
+optional = false
+python-versions = ">=3.6,<4.0"
+version = "0.6.0"
+
+[[package]]
+category = "main"
 description = "Time a block of code."
 name = "charmonium.time-block"
 optional = false
@@ -349,6 +357,14 @@ six = "*"
 test = ["pytest", "mock"]
 
 [[package]]
+category = "main"
+description = "Backported and Experimental Type Hints for Python 3.5+"
+name = "typing-extensions"
+optional = false
+python-versions = "*"
+version = "3.7.4.2"
+
+[[package]]
 category = "dev"
 description = "Measures the displayed width of unicode strings in a terminal"
 name = "wcwidth"
@@ -357,7 +373,7 @@ python-versions = "*"
 version = "0.2.5"
 
 [metadata]
-content-hash = "f453e297969917729ab7e25faea7f9873e26cf6faa77bdf1c8a0e45b3d1227cc"
+content-hash = "5ce8138aeb937596b56bde6a14d413f35a10917390acb374528b66f870357f49"
 lock-version = "1.0"
 python-versions = "^3.8"
 
@@ -369,6 +385,10 @@ appnope = [
 backcall = [
     {file = "backcall-0.2.0-py2.py3-none-any.whl", hash = "sha256:fbbce6a29f263178a1f7915c1940bde0ec2b2a967566fe1c65c1dfb7422bd255"},
     {file = "backcall-0.2.0.tar.gz", hash = "sha256:5cbdbf27be5e7cfadb448baf0aa95508f91f2bbc6c6437cd9cd06e2a4c215e1e"},
+]
+"charmonium.cache" = [
+    {file = "charmonium.cache-0.6.0-py3-none-any.whl", hash = "sha256:a55f30873dc009545444213577d357d01d392860c3d8b48e491e0a72b1c71c25"},
+    {file = "charmonium.cache-0.6.0.tar.gz", hash = "sha256:f07ac0b1e6d3b759ba01dee3549a7fe01cb1f6bd4ceb6cddc203abc8cdf022a1"},
 ]
 "charmonium.time-block" = [
     {file = "charmonium.time_block-0.2.0-py3-none-any.whl", hash = "sha256:9320e9407cfc043d54743b917be6c97bee1f085ad1c0c2fd5d41f40106187a4f"},
@@ -605,6 +625,11 @@ tqdm = [
 traitlets = [
     {file = "traitlets-4.3.3-py2.py3-none-any.whl", hash = "sha256:70b4c6a1d9019d7b4f6846832288f86998aa3b9207c6821f3578a6a6a467fe44"},
     {file = "traitlets-4.3.3.tar.gz", hash = "sha256:d023ee369ddd2763310e4c3eae1ff649689440d4ae59d7485eb4cfbbe3e359f7"},
+]
+typing-extensions = [
+    {file = "typing_extensions-3.7.4.2-py2-none-any.whl", hash = "sha256:f8d2bd89d25bc39dabe7d23df520442fa1d8969b82544370e03d88b5a591c392"},
+    {file = "typing_extensions-3.7.4.2-py3-none-any.whl", hash = "sha256:6e95524d8a547a91e08f404ae485bbb71962de46967e1b71a0cb89af24e761c5"},
+    {file = "typing_extensions-3.7.4.2.tar.gz", hash = "sha256:79ee589a3caca649a9bfd2a8de4709837400dfa00b6cc81962a1e6a1815969ae"},
 ]
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},
