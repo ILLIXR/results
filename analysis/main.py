@@ -547,7 +547,11 @@ with (output_path / "account_summaries.md").open("w") as f:
     plt.rcParams.update({'font.size': 8})
     # plot the same data on both axes
     ax = f.gca()
+    ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv']
     for i, account_name in enumerate(account_names):
+        if account_name in ignore_list:
+            print("ingoring")
+            continue
         ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
         ax.set_title(f"{account_name} CPU Time Timeseries")
         ax.set(ylabel='CPU Time (ms)')
@@ -560,6 +564,9 @@ with (output_path / "account_summaries.md").open("w") as f:
     ts_dir = output_path / "ts"
     ts_dir.mkdir()
     for i, account_name in enumerate(account_names):
+        if account_name in ignore_list:
+            print("ingoring")
+            continue
         f = plt.figure()
         f.tight_layout(pad=2.0)
         plt.rcParams.update({'font.size': 8})
