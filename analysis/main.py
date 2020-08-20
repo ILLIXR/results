@@ -523,6 +523,30 @@ with (output_path / "account_summaries.md").open("w") as f:
         df = ts.loc[account_name]
         f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
         f.write("\n\n")
+
+    f, (ax, ax2, ax3) = plt.subplots(3, sharex=True)
+    f.tight_layout(pad=2.0)
+    plt.rcParams.update({'font.size': 8})
+
+    # plot the same data on both axes
+    ax.plot(ts.loc["OpenVINS Camera", "cpu_time_stop"], ts.loc["OpenVINS Camera", "cpu_time_duration"], 'tab:orange', linewidth=.5)
+    ax.set_title("OpenVINS Camera CPU Time Timeseries")
+    ax.set(ylabel='CPU Time (ms)')
+
+    ax2.plot(ts.loc["OpenVINS IMU", "cpu_time_stop"], ts.loc["OpenVINS IMU", "cpu_time_duration"], 'tab:green', linewidth=.5)
+    ax2.set_title("OpenVINS IMU CPU Time Timeseries")
+    ax2.set(ylabel='CPU Time (ms)')
+
+    ax3.plot(ts.loc["debugview cb", "cpu_time_stop"], ts.loc["debugview cb", "cpu_time_duration"], 'tab:blue', linewidth=.5)
+    ax3.set_title("Debugview CB CPU Time Timeseries")
+    ax3.set(ylabel='CPU Time (ms)')
+
+    plt.xlabel("Timestamp (ms)")
+    plt.savefig("test.png")
+
+    # import IPython; IPython.embed()
+
+    # Add here 
     print(summaries["cpu_time_duration_sum"].to_csv())
 
 import sys
