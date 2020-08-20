@@ -255,7 +255,7 @@ def concat_accounts(
         new_rows
         .assign(
             cpu_time_duration=new_rows[f"cpu_time_duration_a"] + new_rows[f"cpu_time_duration_b"],
-            wall_time_duration=new_rows[f"wall_time_stop_b"] - new_rows[f"wall_time_start_a"],
+            wall_time_duration=new_rows[f"wall_time_duration_b"],
             gpu_time_duration=new_rows[f"gpu_time_duration_a"] + new_rows[f"gpu_time_duration_b"],
         )
     )
