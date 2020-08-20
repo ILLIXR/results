@@ -73,7 +73,7 @@ def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str],
 
     for key, col in df_as_dict.items():
         if all(map(is_int, col)):
-            col = np.array(col, dtype=int)
+            col = list(map(int, col))
         elif all(map(is_float, col)):
             col = np.array(col, dtype=float)
             assert not np.any(np.isnan(col))
@@ -329,15 +329,14 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
         stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
         stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_time_duration"])
-        for df in [stdout_gpu_timer]:
+        for df in [stdout_gpu_timer, timewarp_gpu]:
             # TODO: not this
-            df["gpu_time_start"] = df["gpu_time_duration"].cumsum().shift(1)
-            df["gpu_time_stop" ] = df["gpu_time_duration"].cumsum()
-            del df["gpu_time_duration"]
-        for df in [timewarp_gpu]:
-            df["gpu_time_start"] = df["gpu_time_duration"].shift()
-            df["gpu_time_stop" ] = df["gpu_time_duration"]
-            del df["gpu_time_duration"]
+            if not df.empty:
+                df["gpu_time_start"] = df["gpu_time_duration"].cumsum().shift(1)
+                df["gpu_time_stop" ] = df["gpu_time_duration"].cumsum()
+                del df["gpu_time_duration"]
+                df.drop(index=df.index[0], inplace=True)
+
         stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
         stdout_cpu_timer2 = (
             compute_durations(stdout_cpu_timer2, fix_periods=False)
@@ -450,7 +449,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
         ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
         ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
-        ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
+        # ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
 
     with ch_time_block.ctx("rename accounts", print_start=False):
         ts = rename_accounts(ts, {
