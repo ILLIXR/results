@@ -558,7 +558,7 @@ with (output_path / "account_summaries.md").open("w") as f:
 
     # Individual graphs
     ts_dir = output_path / "ts"
-    ts_dir.mkdir()
+    ts_dir.mkdir(exist_ok=True)
     for i, account_name in enumerate(account_names):
         f = plt.figure()
         f.tight_layout(pad=2.0)
