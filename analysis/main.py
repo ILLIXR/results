@@ -537,9 +537,10 @@ with (output_path / "account_summaries.md").open("w") as f:
     ax2.set_title("OpenVINS IMU CPU Time Timeseries")
     ax2.set(ylabel='CPU Time (ms)')
 
-    ax3.plot(ts.loc["debugview cb", "cpu_time_stop"], ts.loc["debugview cb", "cpu_time_duration"], 'tab:blue', linewidth=.5)
-    ax3.set_title("Debugview CB CPU Time Timeseries")
-    ax3.set(ylabel='CPU Time (ms)')
+    if "debugview cb" in account_names:
+        ax3.plot(ts.loc["debugview cb", "cpu_time_stop"], ts.loc["debugview cb", "cpu_time_duration"], 'tab:blue', linewidth=.5)
+        ax3.set_title("Debugview CB CPU Time Timeseries")
+        ax3.set(ylabel='CPU Time (ms)')
 
     plt.xlabel("Timestamp (ms)")
     plt.savefig("test.png")
