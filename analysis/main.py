@@ -43,7 +43,7 @@ def is_int(string: str) -> bool:
     return bool(re.match(r"^\d+$", string))
 
 def is_float(string: str) -> bool:
-    return bool(re.match(r"^\d+.\d+(e[+-]\d+)$", string))
+    return bool(re.match(r"^\d+.\d+(e[+-]\d+)?$", string))
 
 def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str], other_cols: List[str]) -> pd.DataFrame:
     cols = index_cols + other_cols
@@ -71,14 +71,17 @@ def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str],
     if hits + close_miss != 0 and hits / (hits + close_miss) < 0.95:
         warnings.warn(UserWarning(f"Many ({close_miss} / {close_miss + hits}) lines of {record_name} were spliced incorrectly."))
 
-    df = pd.DataFrame.from_dict({
-        key: (
-            map(int, col) if all(map(is_int, col)) else
-            map(float, col) if all(map(is_float, col)) else
-            col
-        )
-        for key, col in df_as_dict.items()
-    })
+    for key, col in df_as_dict.items():
+        if all(map(is_int, col)):
+            col = np.array(col, dtype=int)
+        elif all(map(is_float, col)):
+            col = np.array(col, dtype=float)
+            assert not np.any(np.isnan(col))
+
+        df_as_dict[key] = col
+            
+    df = pd.DataFrame.from_dict(df_as_dict)
+
     if index_cols:
         df = (
             df
@@ -129,6 +132,16 @@ def compute_durations(
         plugin_start: Optional[pd.DataFrame] = None,
         fix_periods: bool = True,
 ) -> pd.DataFrame:
+    # for clock in clocks:
+    #     for series in [f"{clock}_time_start", f"{clock}_time_stop"]:
+    #         if series in ts:
+    #             nans = pd.to_numeric(ts[series], errors='coerce').isna()
+    #             if nans.sum():
+    #                 print("nans", series)
+    #                 print(ts.dtypes)
+    #                 print(nans.index[nans])
+    #                 print(ts[series])
+    #                 raise ValueError()
     ts = ts.assign(**dict_concat(
         {
             f"{clock}_time_start": pd.to_numeric(ts[f"{clock}_time_start"]),
@@ -311,10 +324,20 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         # Convert it to a bool.
         imu_cam["has_camera"]  = imu_cam["has_camera"] == 1
 
+
     with ch_time_block.ctx("load csv", print_start=False):
         thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
         stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
-        stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_duration"])
+        stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_time_duration"])
+        for df in [stdout_gpu_timer]:
+            # TODO: not this
+            df["gpu_time_start"] = df["gpu_time_duration"].cumsum().shift(1)
+            df["gpu_time_stop" ] = df["gpu_time_duration"].cumsum()
+            del df["gpu_time_duration"]
+        for df in [timewarp_gpu]:
+            df["gpu_time_start"] = df["gpu_time_duration"].shift()
+            df["gpu_time_stop" ] = df["gpu_time_duration"]
+            del df["gpu_time_duration"]
         stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
         stdout_cpu_timer2 = (
             compute_durations(stdout_cpu_timer2, fix_periods=False)
@@ -339,7 +362,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
                         f"{clock}_time_start"   : min,
                         f"{clock}_time_stop"    : max,
                     }
-                    for clock in ["cpu", "gpu", "wall"]
+                    for clock in clocks
                 ),
             })
             .assign(
@@ -372,13 +395,14 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             reindex(set_account_name(stdout_cpu_timer)),
             set_account_name(timewarp_gpu, "timewarp_gl gpu"),
             set_account_name(camera_cvtfmt, "camera_cvtfmt"),
+            set_account_name(stdout_gpu_timer, " gpu", None),
         ])).sort_index()
         ts = pd.concat([ts, stdout_cpu_timer2]).sort_index()
 
     with ch_time_block.ctx("misc", print_start=False):
         account_names = ts.index.levels[0]
         thread_ids["missing_cpu_time_usage"] = np.NaN
-        thread_ids["total_cpu_time_usage"] = np.NaN
+        thread_ids[  "total_cpu_time_usage"] = np.NaN
 
         used = 0
         start = np.inf
@@ -419,7 +443,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
         ts = reindex(ts, ["slam2 cb cam"])
 
     with ch_time_block.ctx("concat accounts", print_start=False):
-        ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
+        # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
         ts = concat_accounts(ts, "slam2 hist l", "slam2 cb cam", "slam2 cb cam")
         ts = concat_accounts(ts, "slam2 hist r", "slam2 cb cam", "slam2 cb cam")
         ts = concat_accounts(ts, "slam2 matching l", "slam2 cb cam", "slam2 cb cam")
@@ -491,8 +515,7 @@ with (output_path / "account_summaries.md").open("w") as f:
     for account_name in account_names:
         f.write(f"# {account_name}\n\n")
         df = ts.loc[account_name]
-        f.write(
-            pd.concat([df.head(), df.tail()]).to_markdown())
+        f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
         f.write("\n\n")
 
 import sys
