@@ -468,7 +468,7 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
             "audio_encoding": "Audio Encoding",
             "audio_decoding": "Audio Decoding",
             "slam2 cb imu": "OpenVINS IMU",
-            "slam2 cb cam": "OpenVINS Camera (incl. OpenCV)",
+            "slam2 cb cam": "OpenVINS Camera",
             **({
                 "offline_imu_cam cam": "Camera loading",
                 "offline_imu_cam imu": "IMU loading",
@@ -523,6 +523,7 @@ with (output_path / "account_summaries.md").open("w") as f:
         df = ts.loc[account_name]
         f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
         f.write("\n\n")
+    print(summaries["cpu_time_duration_sum"].to_csv())
 
 import sys
 sys.exit(0)
