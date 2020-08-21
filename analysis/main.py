@@ -337,7 +337,7 @@ def read_illixr_power(metrics_path: str):
 
 @ch_time_block.decor(print_start=False)
 def get_data(metrics_path: Path) -> Tuple[Any]:
-    #gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
+    gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
     gpu_power = 0
     cpu_time = 0
     cpu_energy = 0
