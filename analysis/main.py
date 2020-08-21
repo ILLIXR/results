@@ -149,7 +149,7 @@ def compute_durations(
             f"{clock}_time_stop" : pd.to_numeric(ts[f"{clock}_time_stop" ]),
         }
         for clock in clocks
-        if f"{clock}_time_start" in ts
+        if f"{clock}_time_start" in ts and clock != "gpu"
     ))
 
     starts = {
@@ -158,7 +158,7 @@ def compute_durations(
             ts[f"{clock}_time_stop" ].min(),
         )
         for clock in clocks
-        if f"{clock}_time_start" in ts
+        if f"{clock}_time_start" in ts and clock != "gpu"
     }
 
     ts = ts.assign(**dict_concat(
@@ -168,13 +168,16 @@ def compute_durations(
         }
         for clock in clocks
     ))
-    ts = ts.assign(**dict_concat(
+    ts = ts.assign(
+        **dict_concat(
             {
                 f"{clock}_time_duration": ts[f"{clock}_time_stop"] - ts[f"{clock}_time_start"] if clock in starts else 0,
             }
             for clock in clocks
+            if clock != "gpu"
         ),
         period=ts["wall_time_start"].diff(),
+        gpu_time_duration=ts["gpu_time_duration"] / 1e6 if "gpu_time_duration" in ts else 0,
     )
     if fix_periods:
         for account_name in ts.index.levels[0]:
@@ -319,261 +322,265 @@ def reindex(ts: pd.DataFrame, accounts: Optional[List[str]] = None) -> pd.DataFr
 @ch_cache.decor(ch_cache.FileStore.create("../metrics"))
 @ch_time_block.decor(print_start=False)
 def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
-    with ch_time_block.ctx("load sqlite", print_start=False):
-        plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
-        threadloop_iteration   = read_illixr_table(metrics_path, "threadloop_iteration"    , ["plugin_id", "iteration_no"])
-        switchboard_callback   = read_illixr_table(metrics_path, "switchboard_callback"    , ["plugin_id", "iteration_no"])
-        switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
-        switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
-        timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
-        imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
-        camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
+    with warnings.catch_warnings(record=True) as warnings_log:
+        with ch_time_block.ctx("load sqlite", print_start=False):
+            plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
+            threadloop_iteration   = read_illixr_table(metrics_path, "threadloop_iteration"    , ["plugin_id", "iteration_no"])
+            switchboard_callback   = read_illixr_table(metrics_path, "switchboard_callback"    , ["plugin_id", "iteration_no"])
+            switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
+            switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
+            timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
+            imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
+            camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
 
-        # This is an integer in SQLite, because no bool in SQLite.
-        # Convert it to a bool.
-        imu_cam["has_camera"]  = imu_cam["has_camera"] == 1
+            # This is an integer in SQLite, because no bool in SQLite.
+            # Convert it to a bool.
+            imu_cam["has_camera"]  = imu_cam["has_camera"] == 1
 
 
-    with ch_time_block.ctx("load csv", print_start=False):
-        thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
-        stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
-        stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_time_duration"])
-        for df in [stdout_gpu_timer, timewarp_gpu]:
-            # TODO: not this
-            if not df.empty:
-                df["gpu_time_start"] = df["gpu_time_duration"].cumsum().shift(1)
-                df["gpu_time_stop" ] = df["gpu_time_duration"].cumsum()
-                del df["gpu_time_duration"]
-                df.drop(index=df.index[0], inplace=True)
-
-        stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
-        stdout_cpu_timer2 = (
-            compute_durations(stdout_cpu_timer2, fix_periods=False)
-        )
-        stdout_cpu_timer2 = (
-            stdout_cpu_timer2
-            .reset_index()
-            .assign(
-                iteration_no=lambda df: df["iteration_no"].mask(df["iteration_no"] == "null", "-1").astype(int)
+        with ch_time_block.ctx("load csv", print_start=False):
+            thread_ids = read_illixr_csv(metrics_path, "thread", [], ["thread_id", "name", "sub_name"])
+            stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
+            stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_time_duration"])
+            for df in [timewarp_gpu, stdout_gpu_timer]:
+                splice_mask = df["gpu_time_duration"] > 1e9
+                if splice_mask.sum() > 5:
+                    warnings.warn(UserWarning(
+                        f"gpu_timer had {splice_mask.sum()} splices, which is kind of high."
+                    ))
+                df.drop(df.index[splice_mask], inplace=True)
+            stdout_cpu_timer2 = read_illixr_csv(metrics_path, "cpu_timer2", ["iteration_no", "thread_id", "sub_iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
+            stdout_cpu_timer2 = (
+                compute_durations(stdout_cpu_timer2, fix_periods=False)
             )
-            .sort_values(["iteration_no", "thread_id", "sub_iteration_no"])
-            .set_index(["iteration_no", "thread_id", "sub_iteration_no"], verify_integrity=verify_integrity)
-            .sort_index()
-        )
-        stdout_cpu_timer2 = (stdout_cpu_timer2
-            .groupby(level=[0])
-            # just groupby iteration_no, coalescing thread_id and sub_iteration_no
-            .agg({
-                **dict_concat(
+            stdout_cpu_timer2 = (
+                stdout_cpu_timer2
+                .reset_index()
+                .assign(
+                    iteration_no=lambda df: df["iteration_no"].mask(df["iteration_no"] == "null", "-1").astype(int)
+                )
+                .sort_values(["iteration_no", "thread_id", "sub_iteration_no"])
+                .set_index(["iteration_no", "thread_id", "sub_iteration_no"], verify_integrity=verify_integrity)
+                .sort_index()
+            )
+            stdout_cpu_timer2 = (stdout_cpu_timer2
+                .groupby(level=[0])
+                # just groupby iteration_no, coalescing thread_id and sub_iteration_no
+                .agg(dict_concat(
                     {
                         f"{clock}_time_duration": sum,
                         f"{clock}_time_start"   : min,
                         f"{clock}_time_stop"    : max,
                     }
                     for clock in clocks
-                ),
-            })
-            .assign(
-                account_name="opencv",
-                period=lambda df: df["wall_time_start"].diff(),
+                ))
+                .assign(
+                    account_name="opencv",
+                    period=lambda df: df["wall_time_start"].diff(),
+                )
             )
+            stdout_cpu_timer2 = (stdout_cpu_timer2
+                .reset_index()
+                .sort_values(["account_name", "iteration_no"])
+                .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
+                .sort_index()
+            )
+
+        switchboard_topic_stop = switchboard_topic_stop.assign(
+            completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
         )
-        stdout_cpu_timer2 = (stdout_cpu_timer2
-            .reset_index()
-            .sort_values(["account_name", "iteration_no"])
-            .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
-            .sort_index()
-        )
+        for row in switchboard_topic_stop.itertuples():
+            if row.completion < 0.95 and row.unprocessed > 0:
+                warnings.warn("\n".join([
+                    f"{row.Index} has many ({row.unprocessed} / {(row.unprocessed + row.processed)}) unprocessed events when ILLIXR terminated.",
+                    "Your hardware resources might be oversubscribed.",
+                ]) , UserWarning)
 
-    switchboard_topic_stop = switchboard_topic_stop.assign(
-        completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
-    )
-    for row in switchboard_topic_stop.itertuples():
-        if row.completion < 0.95 and row.unprocessed > 0:
-            warnings.warn("\n".join([
-                f"{row.Index} has many ({row.unprocessed} / {(row.unprocessed + row.processed)}) unprocessed events when ILLIXR terminated.",
-                "Your hardware resources might be oversubscribed.",
-            ]) , UserWarning)
+        with ch_time_block.ctx("concat data", print_start=False):
+            ts = compute_durations(pd.concat([
+                set_account_name(threadloop_iteration, " iter", plugin_name),
+                set_account_name(switchboard_callback, " cb", plugin_name),
+                set_account_name(switchboard_check_qs, "runtime check_qs"),
+                reindex(set_account_name(stdout_cpu_timer)),
+                set_account_name(timewarp_gpu, "timewarp_gl gpu"),
+                set_account_name(camera_cvtfmt, "camera_cvtfmt"),
+                set_account_name(stdout_gpu_timer, " gpu", None),
+            ])).sort_index()
+            ts = pd.concat([ts, stdout_cpu_timer2]).sort_index()
 
-    with ch_time_block.ctx("concat data", print_start=False):
-        ts = compute_durations(pd.concat([
-            set_account_name(threadloop_iteration, " iter", plugin_name),
-            set_account_name(switchboard_callback, " cb", plugin_name),
-            set_account_name(switchboard_check_qs, "runtime check_qs"),
-            reindex(set_account_name(stdout_cpu_timer)),
-            set_account_name(timewarp_gpu, "timewarp_gl gpu"),
-            set_account_name(camera_cvtfmt, "camera_cvtfmt"),
-            set_account_name(stdout_gpu_timer, " gpu", None),
-        ])).sort_index()
-        ts = pd.concat([ts, stdout_cpu_timer2]).sort_index()
+        with ch_time_block.ctx("misc", print_start=False):
+            account_names = ts.index.levels[0]
+            thread_ids["missing_cpu_time_usage"] = np.NaN
+            thread_ids[  "total_cpu_time_usage"] = np.NaN
 
-    with ch_time_block.ctx("misc", print_start=False):
-        account_names = ts.index.levels[0]
-        thread_ids["missing_cpu_time_usage"] = np.NaN
-        thread_ids[  "total_cpu_time_usage"] = np.NaN
+            used = 0
+            start = np.inf
+            stop = 0
+            for account_name in account_names:
+                if account_name.endswith(" cb"):
+                    used += ts.loc[account_name, "cpu_time_duration"].sum()
+                    start = min(start, ts.loc[account_name, "cpu_time_start"].min())
+                    stop  = max(stop , ts.loc[account_name, "cpu_time_start"].max())
+            used += ts.loc["runtime check_qs", "cpu_time_duration"].sum()
+            start = min(start, ts.loc["runtime check_qs", "cpu_time_start"].min())
+            stop  = max(stop , ts.loc["runtime check_qs", "cpu_time_stop" ].max())
+            thread_ids.loc[thread_ids["sub_name"] == "0", "total_cpu_time_usage"] = stop - start
+            thread_ids.loc[thread_ids["sub_name"] == "0", "missing_cpu_time_usage"] = stop - start - used
 
-        used = 0
-        start = np.inf
-        stop = 0
-        for account_name in account_names:
-            if account_name.endswith(" cb"):
-                used += ts.loc[account_name, "cpu_time_duration"].sum()
-                start = min(start, ts.loc[account_name, "cpu_time_start"].min())
-                stop  = max(stop , ts.loc[account_name, "cpu_time_start"].max())
-        used += ts.loc["runtime check_qs", "cpu_time_duration"].sum()
-        start = min(start, ts.loc["runtime check_qs", "cpu_time_start"].min())
-        stop  = max(stop , ts.loc["runtime check_qs", "cpu_time_stop" ].max())
-        thread_ids.loc[thread_ids["sub_name"] == "0", "total_cpu_time_usage"] = stop - start
-        thread_ids.loc[thread_ids["sub_name"] == "0", "missing_cpu_time_usage"] = stop - start - used
+            for account_name in account_names:
+                if account_name.endswith(" iter"):
+                    thread_name = account_name.split(" ")[0]
+                    used  = ts.loc[account_name, "cpu_time_duration"].sum()
+                    start = ts.loc[account_name, "cpu_time_start"   ].min()
+                    stop  = ts.loc[account_name, "cpu_time_stop"    ].max()
+                    thread_ids.loc[thread_ids["sub_name"] == thread_name, "total_cpu_time_usage"] = stop - start
+                    thread_ids.loc[thread_ids["sub_name"] == thread_name, "missing_cpu_time_usage"] = stop - start - used
 
-        for account_name in account_names:
-            if account_name.endswith(" iter"):
-                thread_name = account_name.split(" ")[0]
-                used  = ts.loc[account_name, "cpu_time_duration"].sum()
-                start = ts.loc[account_name, "cpu_time_start"   ].min()
-                stop  = ts.loc[account_name, "cpu_time_stop"    ].max()
-                thread_ids.loc[thread_ids["sub_name"] == thread_name, "total_cpu_time_usage"] = stop - start
-                thread_ids.loc[thread_ids["sub_name"] == thread_name, "missing_cpu_time_usage"] = stop - start - used
+        with ch_time_block.ctx("split accounts", print_start=False):
 
-    with ch_time_block.ctx("split accounts", print_start=False):
+            bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
 
-        bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
+            has_zed = "zed_camera_thread iter" in ts.index.levels[0]
+            has_gldemo = "gldemo iter" in ts.index.levels[0]
+            if not has_zed:
+                ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
+                ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam imu", ~bool_mask_cam)
+                assert "offline_imu_cam" not in ts.index.levels[0]
 
-        has_zed = "zed_camera_thread iter" in ts.index.levels[0]
-        has_gldemo = "gldemo iter" in ts.index.levels[0]
-        if not has_zed:
-            ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
-            ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam imu", ~bool_mask_cam)
-            assert "offline_imu_cam" not in ts.index.levels[0]
+            ts = split_account(ts, "slam2 cb", "slam2 cb cam",  bool_mask_cam)
+            ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
+            ts = reindex(ts, ["slam2 cb cam"])
 
-        ts = split_account(ts, "slam2 cb", "slam2 cb cam",  bool_mask_cam)
-        ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
-        ts = reindex(ts, ["slam2 cb cam"])
+        with ch_time_block.ctx("concat accounts", print_start=False):
+            # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
+            ts = concat_accounts(ts, "slam2 hist l", "slam2 cb cam", "slam2 cb cam")
+            ts = concat_accounts(ts, "slam2 hist r", "slam2 cb cam", "slam2 cb cam")
+            ts = concat_accounts(ts, "slam2 matching l", "slam2 cb cam", "slam2 cb cam")
+            ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
+            ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
+            ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
+            # ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
 
-    with ch_time_block.ctx("concat accounts", print_start=False):
-        # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
-        ts = concat_accounts(ts, "slam2 hist l", "slam2 cb cam", "slam2 cb cam")
-        ts = concat_accounts(ts, "slam2 hist r", "slam2 cb cam", "slam2 cb cam")
-        ts = concat_accounts(ts, "slam2 matching l", "slam2 cb cam", "slam2 cb cam")
-        ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
-        ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
-        ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
-        # ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
-
-    with ch_time_block.ctx("rename accounts", print_start=False):
-        ts = rename_accounts(ts, {
-            "runtime check_qs": "Runtime",
-            **({
-                "gldemo iter": "Application (GL Demo)"
-            } if has_gldemo else {}),
-            # "camera_cvtfmt": "Camera convert-format",
-            "audio_encoding": "Audio Encoding",
-            "audio_decoding": "Audio Decoding",
-            "slam2 cb imu": "OpenVINS IMU",
-            "slam2 cb cam": "OpenVINS Camera",
-            **({
-                "offline_imu_cam cam": "Camera loading",
-                "offline_imu_cam imu": "IMU loading",
-            } if not has_zed else {
-                "zed_camera_thread": "ZED Camera (part)",
-                "zed_imu_thread": "ZED IMU (part)",
+        with ch_time_block.ctx("rename accounts", print_start=False):
+            ts = rename_accounts(ts, {
+                "runtime check_qs": "Runtime",
+                **({
+                    "gldemo iter": "Application (GL Demo)"
+                } if has_gldemo else {}),
+                # "camera_cvtfmt": "Camera convert-format",
+                "audio_encoding": "Audio Encoding",
+                "audio_decoding": "Audio Decoding",
+                "slam2 cb imu": "OpenVINS IMU",
+                "slam2 cb cam": "OpenVINS Camera",
+                **({
+                    "offline_imu_cam cam": "Camera loading",
+                    "offline_imu_cam imu": "IMU loading",
+                } if not has_zed else {
+                    "zed_camera_thread": "ZED Camera (part)",
+                    "zed_imu_thread": "ZED IMU (part)",
+                })
             })
+
+        summaries = ts.groupby("account_name").agg({
+            "period"            : ["mean", "std"],
+            "cpu_time_duration" : ["mean", "std", "sum"],
+            "wall_time_duration": ["mean", "std", "sum"],
+            "gpu_time_duration" : ["mean", "std", "sum"],
         })
 
-    summaries = ts.groupby("account_name").agg({
-        "period"            : ["mean", "std"],
-        "cpu_time_duration" : ["mean", "std", "sum"],
-        "wall_time_duration": ["mean", "std", "sum"],
-        "gpu_time_duration" : ["mean", "std", "sum"],
-    })
+        # flatten column from multiindex (["cpu_duration", "wall_duration", "period"], ["mean", "std", "sum"])
+        # to single-level index ("cpu_duration_mean", "cpu_duration_std", "cpu_duration_sum", "wall_duration_mean", ...)
+        summaries.columns = ["_".join(column) for column in summaries.columns]
 
-    # flatten column from multiindex (["cpu_duration", "wall_duration", "period"], ["mean", "std", "sum"])
-    # to single-level index ("cpu_duration_mean", "cpu_duration_std", "cpu_duration_sum", "wall_duration_mean", ...)
-    summaries.columns = ["_".join(column) for column in summaries.columns]
+        summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-    summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
+        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-    return ts, summaries, switchboard_topic_stop, thread_ids
+ts, summaries, switchboard_topic_stop, thread_ids, warnings_log = get_data(Path("..") / "metrics")
+account_names = ts.index.levels[0]
 
-ts, summaries, switchboard_topic_stop, thread_ids = get_data(Path("..") / "metrics")
-
-output_path = Path("../output")
-output_path.mkdir(exist_ok=True)
-with (output_path / "account_summaries.md").open("w") as f:
-    f.write("# Summaries\n\n")
-    columns = ["count"] + [col for col in summaries.columns if col != "count"]
-    floatfmt = ["", ".0f", ".1f", ".1f"] + list_concat(["e", "e", "e"] for clock in clocks)
-    f.write(summaries[columns].to_markdown(floatfmt=floatfmt))
-    f.write("\n\n")
-    f.write("# Totals\n\n")
-    f.write(summaries[["cpu_time_duration_sum", "gpu_time_duration_sum"]].sum().to_markdown())
-    f.write("\n\n")
-    f.write("# Thread IDs (of long-running threads)\n\n")
-    f.write(thread_ids.sort_values(["name", "sub_name"]).to_markdown())
-    f.write("\n\n")
-    f.write("# Switchboard topic stops\n\n")
-    f.write(switchboard_topic_stop.to_markdown(floatfmt=["", ".0f", ".0f", ".2f"]))
-    f.write("\n\n")
-    f.write("# Notes\n\n")
-    f.write("- All times are in milliseconds unless otherwise mentioned.\n")
-    f.write("- Total wall runtime = {:.1f} sec\n".format(
-        (ts["wall_time_stop"].max() - ts["wall_time_start"].min()) / 1e3
-    ))
-    f.write("- Next are the first and last few rows of each account.")
-    f.write("\n\n")
-    account_names = ts.index.levels[0]
-    columns = ["period"] + [col for col in ts.columns if col != "period"]
-    for account_name in account_names:
-        f.write(f"# {account_name}\n\n")
-        df = ts.loc[account_name]
-        f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
+with ch_time_block.ctx("generating text output", print_start=False):
+    output_path = Path("../output")
+    output_path.mkdir(exist_ok=True)
+    with (output_path / "account_summaries.md").open("w") as f:
+        f.write("# Summaries\n\n")
+        columns = ["count"] + [col for col in summaries.columns if col != "count"]
+        floatfmt = ["", ".0f", ".1f", ".1f"] + list_concat(["e", "e", "e"] for clock in clocks)
+        f.write(summaries[columns].to_markdown(floatfmt=floatfmt))
         f.write("\n\n")
+        f.write("# Totals\n\n")
+        f.write(summaries[["cpu_time_duration_sum", "gpu_time_duration_sum"]].sum().to_markdown())
+        f.write("\n\n")
+        f.write("# Thread IDs (of long-running threads)\n\n")
+        f.write(thread_ids.sort_values(["name", "sub_name"]).to_markdown())
+        f.write("\n\n")
+        f.write("# Switchboard topic stops\n\n")
+        f.write(switchboard_topic_stop.to_markdown(floatfmt=["", ".0f", ".0f", ".2f"]))
+        f.write("\n\n")
+        f.write("# Notes\n\n")
+        f.write("- All times are in milliseconds unless otherwise mentioned.\n")
+        f.write("- Total wall runtime = {:.1f} sec\n".format(
+            (ts.loc["timewarp_gl iter", "wall_time_stop"].max() - ts.loc["timewarp_gl iter", "wall_time_start"].min()) / 1e3
+        ))
+        f.write("\n\n")
+        f.write("# Warnings\n\n")
+        for warning in warnings_log:
+            f.write(f"- {warning.filename}:{warning.lineno} {warning.message}\n\n")
+        f.write("\n\n")
+        columns = ["period"] + [col for col in ts.columns if col != "period"]
+        for account_name in account_names:
+            f.write(f"# {account_name}\n\n")
+            df = ts.loc[account_name]
+            f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
+            f.write("\n\n")
 
-    # Stacked graphs
-    f, ax = plt.subplots(len(account_names), sharex=True)
-    f.tight_layout(pad=2.0)
-    plt.rcParams.update({'font.size': 8})
-    # plot the same data on both axes
-    for i, account_name in enumerate(account_names):
-        ax[i].plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"], 'tab:orange', linewidth=.5)
-        # ax[i].set_title(f"{account_name} CPU Time Timeseries")
-        # ax[i].set(ylabel='CPU Time (ms)')
-    plt.xlabel("Timestamp (ms)")
-    plt.savefig(output_path / "stacked.png")
+with ch_time_block.ctx("generating plot output", print_start=False):
+        # Stacked graphs
+        f, ax = plt.subplots(len(account_names), sharex=True)
+        f.tight_layout(pad=2.0)
+        plt.rcParams.update({'font.size': 8})
+        # plot the same data on both axes
+        for i, account_name in enumerate(account_names):
+            ax[i].plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"], 'tab:orange', linewidth=.5)
+            # ax[i].set_title(f"{account_name} CPU Time Timeseries")
+            # ax[i].set(ylabel='CPU Time (ms)')
+        plt.xlabel("Timestamp (ms)")
+        plt.savefig(output_path / "stacked.png")
 
-    # Overlayed graphs
-    f = plt.figure()
-    f.tight_layout(pad=2.0)
-    plt.rcParams.update({'font.size': 8})
-    # plot the same data on both axes
-    ax = f.gca()
-    for i, account_name in enumerate(account_names):
-        ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
-        ax.set_title(f"{account_name} CPU Time Timeseries")
-        ax.set(ylabel='CPU Time (ms)')
-    plt.xlabel("Timestamp (ms)")
-    plt.savefig(output_path / "overlayed.png")
-    # import IPython; IPython.embed()
-
-
-    # Individual graphs
-    ts_dir = output_path / "ts"
-    ts_dir.mkdir(exist_ok=True)
-    for i, account_name in enumerate(account_names):
+        # Overlayed graphs
         f = plt.figure()
         f.tight_layout(pad=2.0)
         plt.rcParams.update({'font.size': 8})
         # plot the same data on both axes
         ax = f.gca()
-        ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
-        ax.set_title(f"{account_name} CPU Time Timeseries")
-        ax.set(ylabel='CPU Time (ms)')
+        for i, account_name in enumerate(account_names):
+            ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
+            ax.set_title(f"{account_name} CPU Time Timeseries")
+            ax.set(ylabel='CPU Time (ms)')
         plt.xlabel("Timestamp (ms)")
-        plt.savefig(ts_dir / f"{account_name}.png")
+        plt.savefig(output_path / "overlayed.png")
+        # import IPython; IPython.embed()
 
-    # import IPython; IPython.embed()
 
-    # print(summaries["cpu_time_duration_sum"].to_csv())
+        # Individual graphs
+        ts_dir = output_path / "ts"
+        ts_dir.mkdir(exist_ok=True)
+        for i, account_name in enumerate(account_names):
+            f = plt.figure()
+            f.tight_layout(pad=2.0)
+            plt.rcParams.update({'font.size': 8})
+            # plot the same data on both axes
+            ax = f.gca()
+            ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
+            ax.set_title(f"{account_name} CPU Time Timeseries")
+            ax.set(ylabel='CPU Time (ms)')
+            plt.xlabel("Timestamp (ms)")
+            plt.savefig(ts_dir / f"{account_name}.png")
+
+        # import IPython; IPython.embed()
+
+        # print(summaries["cpu_time_duration_sum"].to_csv())
+
 
 import sys
 sys.exit(0)
