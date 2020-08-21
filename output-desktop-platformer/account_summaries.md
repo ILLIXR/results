@@ -75,15 +75,15 @@
 
 # Warnings
 
-- main.py:348 gpu_timer had 8 splices, which is kind of high.
+- main.py:369 gpu_timer had 8 splices, which is kind of high.
 
-- main.py:394 eyebuffer has many (1277 / 1293) unprocessed events when ILLIXR terminated.
+- main.py:415 eyebuffer has many (1277 / 1293) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:394 imu_cam has many (5875 / 18511) unprocessed events when ILLIXR terminated.
+- main.py:415 imu_cam has many (5875 / 18511) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:241 Merging slam2 pyramid l (1326 rows) with slam2 cb cam (1471 rows), despite row-count mismatch
+- main.py:242 Merging slam2 pyramid l (1326 rows) with slam2 cb cam (1471 rows), despite row-count mismatch
 
 
 

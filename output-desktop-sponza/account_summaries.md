@@ -75,13 +75,13 @@
 
 # Warnings
 
-- main.py:394 eyebuffer has many (908 / 919) unprocessed events when ILLIXR terminated.
+- main.py:415 eyebuffer has many (908 / 919) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:394 imu_cam has many (4640 / 17377) unprocessed events when ILLIXR terminated.
+- main.py:415 imu_cam has many (4640 / 17377) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:241 Merging slam2 pyramid l (1339 rows) with slam2 cb cam (1494 rows), despite row-count mismatch
+- main.py:242 Merging slam2 pyramid l (1339 rows) with slam2 cb cam (1494 rows), despite row-count mismatch
 
 
 
