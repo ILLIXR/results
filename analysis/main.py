@@ -495,7 +495,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-FILE_NAME = "desktop-demo"
+FILE_NAME = "desktop-materials"
 
 @ch_cache.decor(ch_cache.FileStore.create("../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
@@ -544,12 +544,13 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     total_cpu_time = 0.0
     plt.rcParams.update({'font.size': 8})
 
-    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
-    # plot the same data on both axes
+    # App is only in this list because we want to make it appear at the top of the graph
+    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
     for account_name in account_names:
         if account_name in ignore_list:
             continue
         total_cpu_time += summaries["cpu_time_duration_sum"][account_name]
+    total_cpu_time += summaries["cpu_time_duration_sum"]['app']
     
     width = 0.4
     bar_plots = []
@@ -562,6 +563,11 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
         bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
         rolling_sum += bar_height
 
+    # This is only because we want the app section at the top
+    bar_height = (summaries["cpu_time_duration_sum"]['app'] / total_cpu_time)
+    bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+    rolling_sum += bar_height
+
     plt.title('CPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
     plt.xlabel("Jaes Results")
@@ -570,8 +576,10 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.ylabel('Percent of Total CPU Time')
 
     plt.subplots_adjust(right=0.7)
-    plt.legend([x for x in bar_plots][::-1], [name for name in account_names if name not in ignore_list][::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    
+    account_list = [name for name in account_names if name not in ignore_list]
+    account_list.append('app')
+
+    plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked.png")
 
