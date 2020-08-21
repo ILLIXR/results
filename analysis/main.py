@@ -80,7 +80,7 @@ def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str],
             assert not np.any(np.isnan(col))
 
         df_as_dict[key] = col
-            
+
     df = pd.DataFrame.from_dict(df_as_dict)
 
     if index_cols:
@@ -342,6 +342,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             stdout_cpu_timer = read_illixr_csv(metrics_path, "cpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "cpu_time_start", "cpu_time_stop"])
             stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_time_duration"])
             for df in [timewarp_gpu, stdout_gpu_timer]:
+                df["gpu_time_duration"] = pd.to_numeric(df["gpu_time_duration"])
                 splice_mask = df["gpu_time_duration"] > 1e9
                 if splice_mask.sum() > 5:
                     warnings.warn(UserWarning(
@@ -497,7 +498,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
 FILE_NAME = "desktop-sponza"
 
-@ch_cache.decor(ch_cache.FileStore.create("../metrics-" + FILE_NAME))
+@ch_cache.decor(ch_cache.FileStore.create( "../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
@@ -551,14 +552,14 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
             continue
         total_cpu_time += summaries["cpu_time_duration_sum"][account_name]
     total_cpu_time += summaries["cpu_time_duration_sum"]['app']
-    
+
     width = 0.4
     bar_plots = []
     rolling_sum = 0.0
     for idx, name in enumerate(account_names):
         if name in ignore_list:
             continue
-            
+
         bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
         bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
         rolling_sum += bar_height
