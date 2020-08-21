@@ -319,9 +319,8 @@ def reindex(ts: pd.DataFrame, accounts: Optional[List[str]] = None) -> pd.DataFr
         .sort_index()
     )
 
-@ch_cache.decor(ch_cache.FileStore.create("../metrics"))
 @ch_time_block.decor(print_start=False)
-def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
+def get_data(metrics_path: Path) -> Tuple[Any]:
     with warnings.catch_warnings(record=True) as warnings_log:
         with ch_time_block.ctx("load sqlite", print_start=False):
             plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
@@ -496,6 +495,10 @@ def get_data(metrics_path: Path) -> Dict[str, pd.DataFrame]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
+@ch_cache.decor(ch_cache.FileStore.create("../metrics"))
+def get_data_cached(metrics_path: Path) -> Tuple[Any]:
+    return get_data(metrics_path)
+
 ts, summaries, switchboard_topic_stop, thread_ids, warnings_log = get_data(Path("..") / "metrics")
 account_names = ts.index.levels[0]
 
@@ -534,7 +537,7 @@ with ch_time_block.ctx("generating text output", print_start=False):
             f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
             f.write("\n\n")
 
-with ch_time_block.ctx("generating plot output", print_start=False):
+with ch_time_block.ctx("generating combined timeseries", print_start=False):
         # Stacked graphs
         f, ax = plt.subplots(len(account_names), sharex=True)
         f.tight_layout(pad=2.0)
@@ -561,7 +564,7 @@ with ch_time_block.ctx("generating plot output", print_start=False):
         plt.savefig(output_path / "overlayed.png")
         # import IPython; IPython.embed()
 
-with ch_time_block.ctx("generating invid output", print_start=False):
+with ch_time_block.ctx("generating individual timeseries", print_start=False):
         # Individual graphs
         ts_dir = output_path / "ts"
         ts_dir.mkdir(exist_ok=True)
