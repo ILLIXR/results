@@ -537,8 +537,8 @@ run_list = [
     for path in list(Path("..").iterdir())
     if path.name.startswith("metrics-")
 ]
-for run_name in run_list:
-    print(f"Graphs for {run_name}")
+for run_name in tqdm(run_list):
+    tqdm.write(f"Graphs for {run_name}")
     metrics_path = Path("..") / f"metrics-{run_name}"
 
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p = get_data_cached(metrics_path)
@@ -612,20 +612,20 @@ for run_name in run_list:
         if name in ignore_list:
             continue
 
-        bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
+        bar_height = summaries["cpu_time_duration_sum"][name]
         bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
         rolling_sum += bar_height
 
     # This is only because we want the app section at the top
-    bar_height = (summaries["cpu_time_duration_sum"]['app'] / total_cpu_time)
+    bar_height = summaries["cpu_time_duration_sum"]['app']
     bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
     rolling_sum += bar_height
 
     plt.title('CPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
 
-    plt.yticks(np.arange(0, 1.01, .1))
-    plt.ylabel('Percent of Total CPU Time')
+    plt.yticks(np.arange(0, rolling_sum+1, rolling_sum / 10))
+    plt.ylabel('Total CPU Time')
 
     plt.subplots_adjust(right=0.7)
     account_list = [name for name in account_names if name not in ignore_list]
@@ -637,7 +637,7 @@ for run_name in run_list:
     plt.savefig(output_path / "stacked.png")
     plt.close()
 
-    # GPU Energy
+    # GPU Stacked
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     total_gpu_time = 0.0
     for account_name in account_names:
@@ -645,37 +645,24 @@ for run_name in run_list:
             continue
         total_gpu_time += summaries["gpu_time_duration_sum"][account_name]
 
+    plt.clf()
     width = 0.4
     bar_plots = []
-    rolling_sum = 0.0
+
     app_num = summaries["gpu_time_duration_sum"]["app_gpu1"] + summaries["gpu_time_duration_sum"]["app_gpu2"]
-    ignore_list = ["app_gpu1", "app_gpu2"]
-    for idx, name in enumerate(account_names):
-        if name not in gpu_list:
-            continue
-
-        if name in ignore_list:
-            continue
-
-        bar_height = (summaries["gpu_time_duration_sum"][name] / total_gpu_time)
-        if name == "timewarp_gl gpu":
-            bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum, color="brown")[0])
-        else:
-            bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-        rolling_sum += bar_height
-    bar_height = (app_num / total_gpu_time)
-    bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-    rolling_sum += bar_height
+    bar_plots.append(plt.bar(1, summaries["gpu_time_duration_sum"]["hologram"], width=width, bottom=0, color="brown")[0])
+    bar_plots.append(plt.bar(1, summaries["gpu_time_duration_sum"]["timewarp_gl gpu"], width=width, bottom=summaries["gpu_time_duration_sum"]["hologram"])[0])
+    bar_plots.append(plt.bar(1, app_num, width=width, bottom=summaries["gpu_time_duration_sum"]["timewarp_gl gpu"] + summaries["gpu_time_duration_sum"]["hologram"])[0])
 
     plt.title('GPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
 
-    plt.yticks(np.arange(0, 1.01, .1))
-    plt.ylabel('Percent of Total GPU Time')
+    rolling_sum = app_num + summaries["gpu_time_duration_sum"]["timewarp_gl gpu"] + summaries["gpu_time_duration_sum"]["hologram"]
+    plt.yticks(np.arange(0, rolling_sum+1, rolling_sum/10))
+    plt.ylabel('Total GPU Time')
 
     plt.subplots_adjust(right=0.7)
-    account_list = [name for name in account_names if name in gpu_list and name not in ignore_list]
-    account_list.append('Application')
+    account_list = ['Hologram', 'Reprojection', 'Application']
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
 
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
@@ -683,27 +670,27 @@ for run_name in run_list:
     plt.savefig(output_path / "stacked_gpu.png")
     plt.close()
 
-    # Stacked Energy Graphs
-    gpu_energy = gpu_power * cpu_time
-    total_energy = cpu_energy + gpu_energy
-    width = 0.4
-    bar_plots = []
+    # # Stacked Energy Graphs
+    # plt.clf()
+    # gpu_energy = gpu_power * cpu_time
+    # total_energy = cpu_energy + gpu_energy
+    # width = 0.4
+    # bar_plots = []
 
-    cpu_energy_share = cpu_energy/total_energy if total_energy != 0 else 0
-    bar_plots.append(plt.bar(1, cpu_energy_share, width=width, bottom=0)[0])
-    bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom=cpu_energy_share)[0])
+    # bar_plots.append(plt.bar(1, cpu_energy/total_energy, width=width, bottom=0)[0])
+    # bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy/total_energy)[0])
 
-    plt.title('Energy Breakdown Per Run')
-    plt.xticks(np.arange(0, 1, step=1))
+    # plt.title('Energy Breakdown Per Run')
+    # plt.xticks(np.arange(0, 1, step=1))
 
-    plt.yticks(np.arange(0, 1.01, .1))
-    plt.ylabel('Percent of Total Energy')
+    # plt.yticks(np.arange(0, 1.01, .1))
+    # plt.ylabel('Percent of Total Energy')
 
-    plt.subplots_adjust(right=0.7)
-    plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    plt.xlabel("Full System")
-    plt.savefig(output_path / "stacked_energy.png")
-    plt.close()
+    # plt.subplots_adjust(right=0.7)
+    # plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    # plt.xlabel("Full System")
+    # plt.savefig(output_path / "stacked_energy.png")
+    # import IPython; IPython.embed()
 
     # Overlayed graphs
     f = plt.figure()
