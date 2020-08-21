@@ -495,15 +495,17 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-@ch_cache.decor(ch_cache.FileStore.create("../metrics"))
+FILE_NAME = "desktop-sponza"
+
+@ch_cache.decor(ch_cache.FileStore.create("../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
-ts, summaries, switchboard_topic_stop, thread_ids, warnings_log = get_data(Path("..") / "metrics")
+ts, summaries, switchboard_topic_stop, thread_ids, warnings_log = get_data(Path("..") / ("metrics-" + FILE_NAME))
 account_names = ts.index.levels[0]
 
 with ch_time_block.ctx("generating text output", print_start=False):
-    output_path = Path("../output")
+    output_path = Path("../output-" + FILE_NAME)
     output_path.mkdir(exist_ok=True)
     with (output_path / "account_summaries.md").open("w") as f:
         f.write("# Summaries\n\n")
@@ -538,79 +540,88 @@ with ch_time_block.ctx("generating text output", print_start=False):
             f.write("\n\n")
 
 with ch_time_block.ctx("generating combined timeseries", print_start=False):
-        # Stacked graphs
-        f, ax = plt.subplots(len(account_names), sharex=True)
-        f.tight_layout(pad=2.0)
-        plt.rcParams.update({'font.size': 8})
-        # plot the same data on both axes
-        for i, account_name in enumerate(account_names):
-            ax[i].plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"], 'tab:orange', linewidth=.5)
-            # ax[i].set_title(f"{account_name} CPU Time Timeseries")
-            # ax[i].set(ylabel='CPU Time (ms)')
-        plt.xlabel("Timestamp (ms)")
-        plt.savefig(output_path / "stacked.png")
+    # Stacked graphs
+    total_cpu_time = 0.0
+    plt.rcParams.update({'font.size': 8})
 
-        # Stacked graphs
-        # f, ax = plt.subplots(len(account_names), sharex=True)
-        # f.tight_layout(pad=2.0)
+    ignore_list = ['opencv', 'Runtime']
+    # plot the same data on both axes
+    for account_name in account_names:
+        if account_name in ignore_list:
+            continue
+        total_cpu_time += summaries["cpu_time_duration_sum"][account_name]
+    
+    width = 0.4
+    bar_plots = []
+    rolling_sum = 0.0
+    for idx, name in enumerate(account_names):
+        if name in ignore_list:
+            continue
+            
+        bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
+        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+        rolling_sum += bar_height
 
-        total_cpu_time = 0.0
-        plt.rcParams.update({'font.size': 8})
-        # plot the same data on both axes
-        for account_name in account_names:
-            total_cpu_time += summaries["cpu_time_duration_sum"][account_name]
+    plt.title('CPU Time Breakdown Per Run')
+    plt.xticks(np.arange(0, 1, step=1))
+    plt.xlabel("Jaes Results")
 
-        width = 0.4
-        bar_plots = []
-        rolling_sum = 0.0
-        for idx, name in enumerate(account_names):
-            bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
-            bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum))
-            rolling_sum += bar_height
+    plt.yticks(np.arange(0, 1.01, .1))
+    plt.ylabel('Percent of Total CPU Time')
 
-        plt.title('CPU Time Breakdown Per Run')
-        plt.xticks(np.arange(0, 1, step=1))
-        plt.xlabel("Jaes Results")
+    plt.subplots_adjust(right=0.7)
+    plt.legend([x for x in bar_plots][::-1], [name for name in account_names if name not in ignore_list][::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    
+    plt.xlabel("Full System")
+    plt.savefig(output_path / "stacked.png")
 
-        plt.yticks(np.arange(0, 1.01, .1))
-        plt.ylabel('Percent of Total CPU Time')
+    # Overlayed graphs
+    f = plt.figure()
+    f.tight_layout(pad=2.0)
+    plt.rcParams.update({'font.size': 8})
+    # plot the same data on both axes
+    ax = f.gca()
+    ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime']
+    for i, account_name in enumerate(account_names):
+        if account_name in ignore_list:
+            continue
+        x_data = ts.loc[account_name, "wall_time_start"]
+        y_data = ts.loc[account_name, "cpu_time_duration"]
+        if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
+            x_data.drop(x_data.index[0], inplace=True)
+            y_data.drop(y_data.index[0], inplace=True)
+        ax.plot(x_data, y_data, label=account_name)
+        ax.set_title(f"{account_name} CPU Time Timeseries")
+        ax.set(ylabel='CPU Time (ms)')
+    plt.xlabel("Timestamp (ms)")
+    plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    plt.subplots_adjust(right=0.8)
+    plt.yscale("log")
+    plt.savefig(output_path / "overlayed.png")
+    # import IPython; IPython.embed()
 
-
-        plt.subplots_adjust(right=0.7)
-        plt.legend([x[0] for x in bar_plots[::-1]], account_names[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-
-        plt.xlabel("Full System")
-        plt.savefig(output_path / "stacked.png")
-
-        # Overlayed graphs
+    # Individual graphs
+    ts_dir = output_path / "ts"
+    ts_dir.mkdir(exist_ok=True)
+    for i, account_name in enumerate(account_names):
+        if account_name in ignore_list:
+            continue
         f = plt.figure()
         f.tight_layout(pad=2.0)
         plt.rcParams.update({'font.size': 8})
         # plot the same data on both axes
+        x_data = ts.loc[account_name, "wall_time_start"]
+        y_data = ts.loc[account_name, "cpu_time_duration"]
+        if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
+            x_data.drop(x_data.index[0], inplace=True)
+            y_data.drop(y_data.index[0], inplace=True)
         ax = f.gca()
-        for i, account_name in enumerate(account_names):
-            ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
-            ax.set_title(f"{account_name} CPU Time Timeseries")
-            ax.set(ylabel='CPU Time (ms)')
+        ax.plot(x_data, y_data)
+        ax.set_title(f"{account_name} CPU Time Timeseries")
+        ax.set(ylabel='CPU Time (ms)')
         plt.xlabel("Timestamp (ms)")
-        plt.savefig(output_path / "overlayed.png")
-
-        # Individual graphs
-        ts_dir = output_path / "ts"
-        ts_dir.mkdir()
-        for i, account_name in enumerate(account_names):
-            f = plt.figure()
-            f.tight_layout(pad=2.0)
-            plt.rcParams.update({'font.size': 8})
-            # plot the same data on both axes
-            ax = f.gca()
-            for i, account_name in enumerate(account_names):
-                ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
-                ax.set_title(f"{account_name} CPU Time Timeseries")
-                ax.set(ylabel='CPU Time (ms)')
-            plt.xlabel("Timestamp (ms)")
-
-            plt.savefig(ts_dir / f"{account_name}.png")
+        plt.yscale("log")
+        plt.savefig(ts_dir / f"{account_name}.png")
 
     # import IPython; IPython.embed()
     # print(summaries["cpu_time_duration_sum"].to_csv())
