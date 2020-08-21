@@ -563,15 +563,25 @@ with ch_time_block.ctx("generating text output", print_start=False):
             f.write("\n\n")
 
 with ch_time_block.ctx("generating combined timeseries", print_start=False):
+    replaced_names = {
+        'app': 'Application',
+        'zed_imu_thread iter': 'IMU',
+        'zed_camera_thread iter': 'Camera',
+        'timewarp_gl iter': 'Reprojection',
+        'hologram iter': 'Hologram',
+        'audio_encoding iter': 'Encoding',
+        'audio_decoding iter': 'Playback',
+
+        # GPU Values
+        'timewarp_gl gpu': 'Reprojection',
+        'hologram': 'Hologram',
+    }
+
     # Stacked graphs
     total_cpu_time = 0.0
     plt.rcParams.update({'font.size': 8})
 
-    cpu_energy_segs = []
-    cpu_energy_labels = []
-
     # App is only in this list because we want to make it appear at the top of the graph
-
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
     for account_name in account_names:
         if account_name in ignore_list:
@@ -587,21 +597,16 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
             continue
 
         bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
-        cpu_energy_segs.append(bar_height * cpu_energy)
-        cpu_energy_labels.append(name)
         bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
         rolling_sum += bar_height
 
     # This is only because we want the app section at the top
     bar_height = (summaries["cpu_time_duration_sum"]['app'] / total_cpu_time)
     bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-    cpu_energy_segs.append(bar_height * cpu_energy)
-    cpu_energy_labels.append('app')
     rolling_sum += bar_height
 
     plt.title('CPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
-    plt.xlabel("Jaes Results")
 
     plt.yticks(np.arange(0, 1.01, .1))
     plt.ylabel('Percent of Total CPU Time')
@@ -609,15 +614,13 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.subplots_adjust(right=0.7)
     account_list = [name for name in account_names if name not in ignore_list]
     account_list.append('app')
+    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
 
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked.png")
 
-    gpu_energy = gpu_power * cpu_time
-    gpu_energy_segs = []
-    gpu_energy_labels = []
-
+    # GPU Energy
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     total_gpu_time = 0.0
     for account_name in account_names:
@@ -638,8 +641,6 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
             continue
 
         bar_height = (summaries["gpu_time_duration_sum"][name] / total_gpu_time)
-        gpu_energy_segs.append(bar_height * gpu_energy)
-        gpu_energy_labels.append(name)
         if name == "timewarp_gl gpu":
             bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum, color="brown")[0])
         else:
@@ -651,43 +652,36 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
 
     plt.title('GPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
-    plt.xlabel("Jaes Results")
 
     plt.yticks(np.arange(0, 1.01, .1))
     plt.ylabel('Percent of Total GPU Time')
 
     plt.subplots_adjust(right=0.7)
     account_list = [name for name in account_names if name in gpu_list and name not in ignore_list]
-    account_list.append('app')
+    account_list.append('Application')
+    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
 
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked_gpu.png")
 
     # Stacked Energy Graphs
+    gpu_energy = gpu_power * cpu_time
+    total_energy = cpu_energy + gpu_energy
     width = 0.4
     bar_plots = []
-    rolling_sum = 0.0
-    for idx, name in enumerate(cpu_energy_labels):
-        cpu_val = cpu_energy_segs[idx]
-        gpu_val = 0
-        if name in gpu_energy_labels:
-            gpu_val = gpu_energy_segs[gpu_energy_labels.index(name)]
 
-        bar_height = ((cpu_val + gpu_val) / (gpu_energy + cpu_energy))
-        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-        rolling_sum += bar_height
+    bar_plots.append(plt.bar(1, cpu_energy/total_energy, width=width, bottom=0)[0])
+    bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy/total_energy)[0])
 
     plt.title('Energy Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
-    plt.xlabel("Jaes Results")
 
     plt.yticks(np.arange(0, 1.01, .1))
     plt.ylabel('Percent of Total Energy')
 
     plt.subplots_adjust(right=0.7)
-
-    plt.legend([x for x in bar_plots][::-1], cpu_energy_labels[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked_energy.png")
 
@@ -706,7 +700,11 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
         if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
             x_data.drop(x_data.index[0], inplace=True)
             y_data.drop(y_data.index[0], inplace=True)
-        ax.plot(x_data, y_data, label=account_name)
+        if account_name in replaced_names:
+            ax.plot(x_data, y_data, label=replaced_names[account_name])
+        else:
+            ax.plot(x_data, y_data, label=account_name)
+
         ax.set_title(f"{account_name} CPU Time Timeseries")
         ax.set(ylabel='CPU Time (ms)')
     plt.xlabel("Timestamp (ms)")
