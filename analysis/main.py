@@ -337,7 +337,10 @@ def read_illixr_power(metrics_path: str):
 
 @ch_time_block.decor(print_start=False)
 def get_data(metrics_path: Path) -> Tuple[Any]:
-    gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
+    #gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
+    gpu_power = 0
+    cpu_time = 0
+    cpu_energy = 0
 
     with warnings.catch_warnings(record=True) as warnings_log:
         with ch_time_block.ctx("load sqlite", print_start=False):
@@ -566,7 +569,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
 
     cpu_energy_segs = []
     cpu_energy_labels = []
-    
+
     # App is only in this list because we want to make it appear at the top of the graph
 
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
@@ -614,7 +617,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     gpu_energy = gpu_power * cpu_time
     gpu_energy_segs = []
     gpu_energy_labels = []
-    
+
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     total_gpu_time = 0.0
     for account_name in account_names:
@@ -687,7 +690,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.legend([x for x in bar_plots][::-1], cpu_energy_labels[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked_energy.png")
-    
+
     # Overlayed graphs
     f = plt.figure()
     f.tight_layout(pad=2.0)
