@@ -352,6 +352,16 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
             imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
             camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
+            try:
+                # try...except for "backwards compatibility reasons"
+                m2p                = read_illixr_table(metrics_path, "m2p"                     , ["iteration_no"])
+            except Exception:
+                warnings.warn("Using fake data for m2p")
+                m2p = pd.DataFrame.from_dict(dict(
+                    iteration_no=[0, 1, 2],
+                    vsync=[100e6, 200e6, 300e6],
+                    imu_time=[90e6, 180e6, 175e6],
+                ))
 
             # This is an integer in SQLite, because no bool in SQLite.
             # Convert it to a bool.
@@ -515,7 +525,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy
+        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p
 
 FILE_NAME = "desktop-platformer"
 
@@ -523,7 +533,7 @@ FILE_NAME = "desktop-platformer"
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
-ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy = get_data(Path("..") / ("metrics-" + FILE_NAME))
+ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p = get_data(Path("..") / ("metrics-" + FILE_NAME))
 
 account_names = ts.index.levels[0]
 
@@ -671,8 +681,9 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     width = 0.4
     bar_plots = []
 
-    bar_plots.append(plt.bar(1, cpu_energy/total_energy, width=width, bottom=0)[0])
-    bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy/total_energy)[0])
+    cpu_energy_share = cpu_energy/total_energy if total_energy != 0 else 0
+    bar_plots.append(plt.bar(1, cpu_energy_share, width=width, bottom=0)[0])
+    bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom=cpu_energy_share)[0])
 
     plt.title('Energy Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
@@ -739,6 +750,15 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
 
     # import IPython; IPython.embed()
     # print(summaries["cpu_time_duration_sum"].to_csv())
+
+    fig = plt.figure()
+    ax = plt.gca()
+    ys = (m2p["vsync"] - m2p["imu_time"]) / 1e6
+    xs = (m2p["vsync"] - m2p["vsync"].iloc[0]) / 1e9
+    ax.plot(xs, ys)
+    ax.set_xlabel("Time since application start (sec)")
+    ax.set_ylabel("Motion-to-photon (ms)")
+    fig.savefig(output_path / "m2p.png")
 
 import sys
 sys.exit(0)
