@@ -495,7 +495,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-FILE_NAME = "desktop-sponza"
+FILE_NAME = "desktop-demo"
 
 @ch_cache.decor(ch_cache.FileStore.create("../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
@@ -544,7 +544,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     total_cpu_time = 0.0
     plt.rcParams.update({'font.size': 8})
 
-    ignore_list = ['opencv', 'Runtime']
+    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     # plot the same data on both axes
     for account_name in account_names:
         if account_name in ignore_list:
