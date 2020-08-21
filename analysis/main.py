@@ -495,7 +495,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-FILE_NAME = "desktop-materials"
+FILE_NAME = "desktop-sponza"
 
 @ch_cache.decor(ch_cache.FileStore.create("../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
@@ -589,7 +589,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.rcParams.update({'font.size': 8})
     # plot the same data on both axes
     ax = f.gca()
-    ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime']
+    ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime', 'camera_cvtfmt', 'zed_imu_thread iter', 'OpenVINS IMU', 'camera_cvtfmt']
     for i, account_name in enumerate(account_names):
         if account_name in ignore_list:
             continue
@@ -603,7 +603,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
         ax.set(ylabel='CPU Time (ms)')
     plt.xlabel("Timestamp (ms)")
     plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    plt.subplots_adjust(right=0.8)
+    plt.subplots_adjust(right=0.6)
     plt.yscale("log")
     plt.savefig(output_path / "overlayed.png")
     # import IPython; IPython.embed()
