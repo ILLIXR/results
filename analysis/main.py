@@ -561,11 +561,11 @@ with ch_time_block.ctx("generating plot output", print_start=False):
         plt.savefig(output_path / "overlayed.png")
         # import IPython; IPython.embed()
 
-
+with ch_time_block.ctx("generating invid output", print_start=False):
         # Individual graphs
         ts_dir = output_path / "ts"
         ts_dir.mkdir(exist_ok=True)
-        for i, account_name in enumerate(account_names):
+        for i, account_name in enumerate(tqdm(account_names)):
             f = plt.figure()
             f.tight_layout(pad=2.0)
             plt.rcParams.update({'font.size': 8})
