@@ -496,7 +496,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-FILE_NAME = "desktop-sponza"
+FILE_NAME = "desktop-platformer"
 
 @ch_cache.decor(ch_cache.FileStore.create( "../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
