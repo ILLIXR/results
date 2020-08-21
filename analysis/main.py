@@ -530,21 +530,25 @@ with (output_path / "account_summaries.md").open("w") as f:
         f.write("\n\n")
 
     # Stacked graphs
-    # f, ax = plt.subplots(len(account_names), sharex=True)
-    # f.tight_layout(pad=2.0)
-
     total_cpu_time = 0.0
     plt.rcParams.update({'font.size': 8})
+
+    ignore_list = ['opencv', 'Runtime']
     # plot the same data on both axes
     for account_name in account_names:
+        if account_name in ignore_list:
+            continue
         total_cpu_time += summaries["cpu_time_duration_sum"][account_name]
     
     width = 0.4
     bar_plots = []
     rolling_sum = 0.0
     for idx, name in enumerate(account_names):
+        if name in ignore_list:
+            continue
+            
         bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
-        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum))
+        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
         rolling_sum += bar_height
 
     plt.title('CPU Time Breakdown Per Run')
@@ -554,9 +558,8 @@ with (output_path / "account_summaries.md").open("w") as f:
     plt.yticks(np.arange(0, 1.01, .1))
     plt.ylabel('Percent of Total CPU Time')
 
-
     plt.subplots_adjust(right=0.7)
-    plt.legend([x[0] for x in bar_plots[::-1]], account_names[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    plt.legend([x for x in bar_plots][::-1], [name for name in account_names if name not in ignore_list][::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked.png")
@@ -567,26 +570,46 @@ with (output_path / "account_summaries.md").open("w") as f:
     plt.rcParams.update({'font.size': 8})
     # plot the same data on both axes
     ax = f.gca()
+    ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime']
     for i, account_name in enumerate(account_names):
-        ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
+        if account_name in ignore_list:
+            continue
+        x_data = ts.loc[account_name, "wall_time_start"]
+        y_data = ts.loc[account_name, "cpu_time_duration"]
+        if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
+            x_data.drop(x_data.index[0], inplace=True)
+            y_data.drop(y_data.index[0], inplace=True)
+        ax.plot(x_data, y_data, label=account_name)
         ax.set_title(f"{account_name} CPU Time Timeseries")
         ax.set(ylabel='CPU Time (ms)')
     plt.xlabel("Timestamp (ms)")
+    plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    plt.subplots_adjust(right=0.8)
+    plt.yscale("log")
     plt.savefig(output_path / "overlayed.png")
+    # import IPython; IPython.embed()
 
     # Individual graphs
     ts_dir = output_path / "ts"
-    ts_dir.mkdir()
+    ts_dir.mkdir(exist_ok=True)
     for i, account_name in enumerate(account_names):
+        if account_name in ignore_list:
+            continue
         f = plt.figure()
         f.tight_layout(pad=2.0)
         plt.rcParams.update({'font.size': 8})
         # plot the same data on both axes
+        x_data = ts.loc[account_name, "wall_time_start"]
+        y_data = ts.loc[account_name, "cpu_time_duration"]
+        if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
+            x_data.drop(x_data.index[0], inplace=True)
+            y_data.drop(y_data.index[0], inplace=True)
         ax = f.gca()
-        ax.plot(ts.loc[account_name, "wall_time_start"], ts.loc[account_name, "cpu_time_duration"])
+        ax.plot(x_data, y_data)
         ax.set_title(f"{account_name} CPU Time Timeseries")
         ax.set(ylabel='CPU Time (ms)')
         plt.xlabel("Timestamp (ms)")
+        plt.yscale("log")
         plt.savefig(ts_dir / f"{account_name}.png")
 
     # import IPython; IPython.embed()
