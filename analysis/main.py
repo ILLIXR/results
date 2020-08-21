@@ -335,7 +335,7 @@ def read_illixr_power(metrics_path: str):
     nvidia_power = sum([float(val) for val in nvidia_res])
     return nvidia_power, perf_time, perf_energy
 
-@ch_time_block.decor(print_start=False)
+@ch_time_block.decor(print_start=False, print_args=True)
 def get_data(metrics_path: Path) -> Tuple[Any]:
     #gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
     gpu_power = 0
@@ -527,18 +527,25 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p
 
-FILE_NAME = "desktop-platformer"
-
-@ch_cache.decor(ch_cache.FileStore.create( "../metrics-" + FILE_NAME))
+@ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
-ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p = get_data(Path("..") / ("metrics-" + FILE_NAME))
+# TODO: use ../metrics/blah/ instead of ../metrics-blah/
+run_list = [
+    path.name.partition("-")[2]
+    for path in list(Path("..").iterdir())
+    if path.name.startswith("metrics-")
+]
+for run_name in run_list:
+    print(f"Graphs for {run_name}")
+    metrics_path = Path("..") / f"metrics-{run_name}"
 
-account_names = ts.index.levels[0]
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p = get_data_cached(metrics_path)
 
-with ch_time_block.ctx("generating text output", print_start=False):
-    output_path = Path("../output-" + FILE_NAME)
+    account_names = ts.index.levels[0]
+
+    output_path = Path("..") / f"output-{run_name}"
     output_path.mkdir(exist_ok=True)
     with (output_path / "account_summaries.md").open("w") as f:
         f.write("# Summaries\n\n")
@@ -572,7 +579,6 @@ with ch_time_block.ctx("generating text output", print_start=False):
             f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
             f.write("\n\n")
 
-with ch_time_block.ctx("generating combined timeseries", print_start=False):
     replaced_names = {
         'app': 'Application',
         'zed_imu_thread iter': 'IMU',
@@ -629,6 +635,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked.png")
+    plt.close()
 
     # GPU Energy
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
@@ -674,6 +681,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked_gpu.png")
+    plt.close()
 
     # Stacked Energy Graphs
     gpu_energy = gpu_power * cpu_time
@@ -695,6 +703,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked_energy.png")
+    plt.close()
 
     # Overlayed graphs
     f = plt.figure()
@@ -706,8 +715,8 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     for i, account_name in enumerate(account_names):
         if account_name in ignore_list:
             continue
-        x_data = ts.loc[account_name, "wall_time_start"]
-        y_data = ts.loc[account_name, "cpu_time_duration"]
+        x_data = ts.loc[account_name, "wall_time_start"].copy()
+        y_data = ts.loc[account_name, "cpu_time_duration"].copy()
         if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
             x_data.drop(x_data.index[0], inplace=True)
             y_data.drop(y_data.index[0], inplace=True)
@@ -723,6 +732,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.subplots_adjust(right=0.6)
     plt.yscale("log")
     plt.savefig(output_path / "overlayed.png")
+    plt.close()
     # import IPython; IPython.embed()
 
     # Individual graphs
@@ -735,8 +745,8 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
         f.tight_layout(pad=2.0)
         plt.rcParams.update({'font.size': 8})
         # plot the same data on both axes
-        x_data = ts.loc[account_name, "wall_time_start"]
-        y_data = ts.loc[account_name, "cpu_time_duration"]
+        x_data = ts.loc[account_name, "wall_time_start"].copy()
+        y_data = ts.loc[account_name, "cpu_time_duration"].copy()
         if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
             x_data.drop(x_data.index[0], inplace=True)
             y_data.drop(y_data.index[0], inplace=True)
@@ -747,6 +757,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
         plt.xlabel("Timestamp (ms)")
         plt.yscale("log")
         plt.savefig(ts_dir / f"{account_name}.png")
+        plt.close()
 
     # import IPython; IPython.embed()
     # print(summaries["cpu_time_duration_sum"].to_csv())
@@ -759,152 +770,4 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     ax.set_xlabel("Time since application start (sec)")
     ax.set_ylabel("Motion-to-photon (ms)")
     fig.savefig(output_path / "m2p.png")
-
-import sys
-sys.exit(0)
-
-with ch_time_block.ctx("Plot bar chart of CPU time share", print_start=False):
-    total_cpu_time = ts["cpu_duration"].sum()
-
-    # counts = pd.merge(ts.reset_index(), summaries, left_on=["account_name"], right_index=True, how="left")["count"]
-    # ts["cpu_duration_share"] = ts["cpu_duration"] / total_cpu_time * 100
-    # #* counts
-    # ax = sns.violinplot(
-    #     x="account_name",
-    #     y="cpu_duration_share",
-    #     inner="stick",
-    #     data=ts.reset_index(),
-    # )
-    # ax.get_figure().savefig(output_path / "cpu_time_violins.png")
-    # plt.close(ax.get_figure())
-
-    summaries.sort_values("cpu_duration_sum", inplace=True)
-    summaries["cpu_duration_share"] = summaries["cpu_duration_sum"] / total_cpu_time
-    # I derived this from the Central Limit Theorem
-    # sigma_sum^2 = sigma_individ^2 / sqrt(n).
-    # sigma_sum = sigma_individ / n^(1/4)
-    #
-    summaries["cpu_duration_std"] = summaries["cpu_duration_std"] * summaries["count"]**(3/4) / total_cpu_time
-
-    summaries2_share = collections.defaultdict(lambda: 0)
-    summaries2_std = collections.defaultdict(lambda: 0)
-    account_group_names = []
-    for account_name in summaries.index:
-        account_group_name = account_name.split(" ")[0].strip()
-        summaries2_share[account_group_name] += summaries.loc[account_name]["cpu_duration_share"]
-        summaries2_std[account_group_name] = np.sqrt(summaries.loc[account_name]["cpu_duration_std"]**2 + summaries2_std[account_group_name]**2)
-        account_group_names.append(account_group_name)
-
-    fig = plt.figure()
-    ax = fig.gca()
-    ax.bar(
-        x=account_group_names,
-        height=[100*summaries2_share[account_group_name] for account_group_name in account_group_names],
-        yerr  =[100*summaries2_std  [account_group_name] for account_group_name in account_group_names],
-    )
-    ax.set_ylim(0, 100)
-    ax.set_xticklabels(account_group_names, rotation=90)
-    ax.set_ylabel("% of total CPU time")
-    ax.set_title("Breakdown of total CPU time")
-
-    fig.tight_layout()
-    fig.savefig(output_path / "cpu_time_per_account.png")
     plt.close(fig)
-
-    accounts = sorted(set(ts.index.levels[0]))
-
-with ch_time_block.ctx("Plot timeseries charts", print_start=False):
-    fig = plt.figure()
-    ax = fig.gca()
-    for account in accounts:
-        xs = ts.loc[account]["wall_time_start"]
-        ys = ts.loc[account]["cpu_duration"]
-        ax.plot((xs - xs.iloc[0]) / 1e3, ys / ys.mean(), label=account)
-    ax.legend()
-    ax.set_title("Normalized CPU-time duration")
-    ax.set_ylabel("CPU-time duration (multiples of account mean)")
-    ax.set_xlabel("time since start (s)")
-    ax.set_ylim(0, 20)
-    fig.savefig(output_path / "account_durations_normalized_timeseries.png")
-    plt.close(fig)
-
-def nice_histogram(ys: np.array, label: str, title: str, account: str, path: Path, bins: int):
-    fig = plt.figure()
-    ax = fig.gca()
-    ax.hist(ys, bins=bins, align='mid')
-    ax.plot(ys, np.random.randn(*ys.shape) * (ax.get_ylim()[1] * 0.2) + (ax.get_ylim()[1] * 0.5) * np.ones(ys.shape), linestyle='', marker='.', ms=1)
-    ax.set_title(title)
-    ax.set_xlabel(label)
-    fig.savefig(path / f"{account.replace(' ', '-')}.png")
-    plt.close(fig)
-
-cpu_duration_hist_path = output_path / "cpu_duration_hists"
-period_hist_path = output_path / "period_hists"
-wall_duration_hist_path = output_path / "wall_duration_hists"
-gpu_duration_hist_path = output_path / "gpu_duration_hists"
-gpu_overhead_hist_path = output_path / "gpu_overhead_hists"
-utilization_hist_path = output_path / "utilization_hists"
-
-with ch_time_block.ctx("Plot histograms", print_start=False):
-    for path in [
-            cpu_duration_hist_path,
-            wall_duration_hist_path,
-            period_hist_path,
-            utilization_hist_path,
-            gpu_duration_hist_path,
-    ]:
-        if path.exists():
-            shutil.rmtree(path)
-        path.mkdir()
-
-    for account in tqdm(accounts):
-        nice_histogram(
-            ts.loc[account]["wall_duration"],
-            "Wall time (ms)",
-            f"Wall time duration of {account}",
-            account,
-            wall_duration_hist_path,
-            60,
-        )
-        nice_histogram(
-            ts.loc[account]["cpu_duration"],
-            "CPU time (ms)",
-            f"CPU time duration of {account}",
-            account,
-            cpu_duration_hist_path,
-            60,
-        )
-        nice_histogram(
-            ts.loc[account]["cpu_duration"] / ts.loc[account]["wall_duration"] * 100,
-            "Utilization (%)",
-            f"Utilization of {account}",
-            account,
-            utilization_hist_path,
-            60,
-        )
-        nice_histogram(
-            np.diff(ts.loc[account]["wall_time_start"]),
-            "Period (ms)",
-            f"Periods of {account}",
-            account,
-            period_hist_path,
-            60,
-        )
-
-nice_histogram(
-    ts.loc["timewarp_gl gpu"]["gpu_duration"],
-    "GPU time (ms)",
-    "GPU time of timewarp",
-    "timewarp_gl GPU calls",
-    gpu_duration_hist_path,
-    60,
-)
-
-nice_histogram(
-    ts.loc["timewarp_gl gpu"]["gpu_duration"] / ts.loc["timewarp_gl iter"]["cpu_duration"],
-    "CPU overhead (%)",
-    "CPU overhead of timewarp_gl GPU calls",
-    "timewarp_gl GPU calls",
-    gpu_overhead_hist_path,
-    60,
-)
