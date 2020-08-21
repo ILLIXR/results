@@ -496,7 +496,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
 
-FILE_NAME = "desktop-platformer"
+FILE_NAME = "desktop-demo"
 
 @ch_cache.decor(ch_cache.FileStore.create( "../metrics-" + FILE_NAME))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
@@ -546,6 +546,7 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.rcParams.update({'font.size': 8})
 
     # App is only in this list because we want to make it appear at the top of the graph
+
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
     for account_name in account_names:
         if account_name in ignore_list:
@@ -583,6 +584,50 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked.png")
+
+    gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+    total_gpu_time = 0.0
+    for account_name in account_names:
+        if account_name not in gpu_list:
+            continue
+        total_gpu_time += summaries["gpu_time_duration_sum"][account_name]
+
+    width = 0.4
+    bar_plots = []
+    rolling_sum = 0.0
+    app_num = summaries["gpu_time_duration_sum"]["app_gpu1"] + summaries["gpu_time_duration_sum"]["app_gpu2"] 
+    ignore_list = ["app_gpu1", "app_gpu2"]
+    for idx, name in enumerate(account_names):
+        if name not in gpu_list:
+            continue
+
+        if name in ignore_list:
+            continue
+
+        bar_height = (summaries["gpu_time_duration_sum"][name] / total_gpu_time)
+        if name == "timewarp_gl gpu":
+            bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum, color="brown")[0])
+        else:
+            bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+        rolling_sum += bar_height
+    bar_height = (app_num / total_gpu_time)
+    bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+    rolling_sum += bar_height
+    
+    plt.title('GPU Time Breakdown Per Run')
+    plt.xticks(np.arange(0, 1, step=1))
+    plt.xlabel("Jaes Results")
+
+    plt.yticks(np.arange(0, 1.01, .1))
+    plt.ylabel('Percent of Total GPU Time')
+
+    plt.subplots_adjust(right=0.7)
+    account_list = [name for name in account_names if name in gpu_list and name not in ignore_list]
+    account_list.append('app')
+
+    plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    plt.xlabel("Full System")
+    plt.savefig(output_path / "stacked_gpu.png")
 
     # Overlayed graphs
     f = plt.figure()
