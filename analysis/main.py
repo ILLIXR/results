@@ -16,6 +16,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import subprocess
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -319,8 +320,25 @@ def reindex(ts: pd.DataFrame, accounts: Optional[List[str]] = None) -> pd.DataFr
         .sort_index()
     )
 
+def read_illixr_power(metrics_path: str):
+    read_perf_cmd = "cat {}/perf-results.txt | grep 'energy-pkg\|energy-ram\|seconds' | sed 's/[^0-9.]*//g'".format(metrics_path)
+
+    res = subprocess.run(read_perf_cmd, shell=True, stdout=subprocess.PIPE)
+    perf_res = res.stdout.splitlines()
+    perf_energy = float(perf_res[0]) + float(perf_res[1])
+    perf_time = float(perf_res[2])
+
+    read_nvidia_cmd = 'cat {}/nvidia-smi.txt | grep -A 5 "Power Readings" | grep "Power Draw" | sed \'s/[^0-9.]*//g\''.format(metrics_path)
+
+    res = subprocess.run(read_perf_cmd, shell=True, stdout=subprocess.PIPE)
+    nvidia_res = res.stdout.splitlines()
+    nvidia_power = sum([float(val) for val in nvidia_res])
+    return nvidia_power, perf_time, perf_energy
+
 @ch_time_block.decor(print_start=False)
 def get_data(metrics_path: Path) -> Tuple[Any]:
+    gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
+
     with warnings.catch_warnings(record=True) as warnings_log:
         with ch_time_block.ctx("load sqlite", print_start=False):
             plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
@@ -494,7 +512,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log
+        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy
 
 FILE_NAME = "desktop-demo"
 
@@ -502,7 +520,8 @@ FILE_NAME = "desktop-demo"
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
-ts, summaries, switchboard_topic_stop, thread_ids, warnings_log = get_data(Path("..") / ("metrics-" + FILE_NAME))
+ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy = get_data(Path("..") / ("metrics-" + FILE_NAME))
+
 account_names = ts.index.levels[0]
 
 with ch_time_block.ctx("generating text output", print_start=False):
@@ -545,6 +564,9 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     total_cpu_time = 0.0
     plt.rcParams.update({'font.size': 8})
 
+    cpu_energy_segs = []
+    cpu_energy_labels = []
+    
     # App is only in this list because we want to make it appear at the top of the graph
 
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
@@ -562,12 +584,16 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
             continue
 
         bar_height = (summaries["cpu_time_duration_sum"][name] / total_cpu_time)
+        cpu_energy_segs.append(bar_height * cpu_energy)
+        cpu_energy_labels.append(name)
         bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
         rolling_sum += bar_height
 
     # This is only because we want the app section at the top
     bar_height = (summaries["cpu_time_duration_sum"]['app'] / total_cpu_time)
     bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+    cpu_energy_segs.append(bar_height * cpu_energy)
+    cpu_energy_labels.append('app')
     rolling_sum += bar_height
 
     plt.title('CPU Time Breakdown Per Run')
@@ -585,6 +611,10 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked.png")
 
+    gpu_energy = gpu_power * cpu_time
+    gpu_energy_segs = []
+    gpu_energy_labels = []
+    
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     total_gpu_time = 0.0
     for account_name in account_names:
@@ -605,6 +635,8 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
             continue
 
         bar_height = (summaries["gpu_time_duration_sum"][name] / total_gpu_time)
+        gpu_energy_segs.append(bar_height * gpu_energy)
+        gpu_energy_labels.append(name)
         if name == "timewarp_gl gpu":
             bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum, color="brown")[0])
         else:
@@ -629,6 +661,33 @@ with ch_time_block.ctx("generating combined timeseries", print_start=False):
     plt.xlabel("Full System")
     plt.savefig(output_path / "stacked_gpu.png")
 
+    # Stacked Energy Graphs
+    width = 0.4
+    bar_plots = []
+    rolling_sum = 0.0
+    for idx, name in enumerate(cpu_energy_labels):
+        cpu_val = cpu_energy_segs[idx]
+        gpu_val = 0
+        if name in gpu_energy_labels:
+            gpu_val = gpu_energy_segs[gpu_energy_labels.index(name)]
+
+        bar_height = ((cpu_val + gpu_val) / (gpu_energy + cpu_energy))
+        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+        rolling_sum += bar_height
+
+    plt.title('Energy Breakdown Per Run')
+    plt.xticks(np.arange(0, 1, step=1))
+    plt.xlabel("Jaes Results")
+
+    plt.yticks(np.arange(0, 1.01, .1))
+    plt.ylabel('Percent of Total Energy')
+
+    plt.subplots_adjust(right=0.7)
+
+    plt.legend([x for x in bar_plots][::-1], cpu_energy_labels[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    plt.xlabel("Full System")
+    plt.savefig(output_path / "stacked_energy.png")
+    
     # Overlayed graphs
     f = plt.figure()
     f.tight_layout(pad=2.0)
