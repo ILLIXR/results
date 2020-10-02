@@ -1,8 +1,0 @@
-run:
-  mode: opt
-  time: 60s
-  plugins: See ./ILLIXR/Makefile
-  system: Jetson AGX Xavier (MAXN Mode)
-  notes: 
-  - App Inner Total: 57197149261
-  - App CPU Total: 43147593024
