@@ -527,7 +527,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p
 
-@ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
+#@ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
