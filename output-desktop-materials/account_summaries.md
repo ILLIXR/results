@@ -77,27 +77,29 @@
 
 # Warnings
 
-- main.py:369 gpu_timer had 11 splices, which is kind of high.
+- main.py:361 Using fake data for m2p
 
-- main.py:415 cam_type has many (2148 / 2198) unprocessed events when ILLIXR terminated.
+- main.py:381 gpu_timer had 11 splices, which is kind of high.
+
+- main.py:427 cam_type has many (2148 / 2198) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 eyebuffer has many (1058 / 1074) unprocessed events when ILLIXR terminated.
+- main.py:427 eyebuffer has many (1058 / 1074) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 hologram_in has many (1952 / 2268) unprocessed events when ILLIXR terminated.
+- main.py:427 hologram_in has many (1952 / 2268) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 imu_biases has many (3776 / 13454) unprocessed events when ILLIXR terminated.
+- main.py:427 imu_biases has many (3776 / 13454) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 imu_cam has many (4247 / 18066) unprocessed events when ILLIXR terminated.
+- main.py:427 imu_cam has many (4247 / 18066) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 slow_pose has many (461 / 1633) unprocessed events when ILLIXR terminated.
+- main.py:427 slow_pose has many (461 / 1633) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 vsync_estimate has many (1953 / 2268) unprocessed events when ILLIXR terminated.
+- main.py:427 vsync_estimate has many (1953 / 2268) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
 - main.py:242 Merging slam2 pyramid l (1458 rows) with slam2 cb cam (1620 rows), despite row-count mismatch

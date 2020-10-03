@@ -77,10 +77,12 @@
 
 # Warnings
 
-- main.py:415 cam_type has many (2133 / 2138) unprocessed events when ILLIXR terminated.
+- main.py:361 Using fake data for m2p
+
+- main.py:427 cam_type has many (2133 / 2138) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
-- main.py:415 imu_cam has many (10826 / 17497) unprocessed events when ILLIXR terminated.
+- main.py:427 imu_cam has many (10826 / 17497) unprocessed events when ILLIXR terminated.
 Your hardware resources might be oversubscribed.
 
 - main.py:242 Merging slam2 hist l (782 rows) with slam2 cb cam (825 rows), despite row-count mismatch
