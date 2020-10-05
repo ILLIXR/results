@@ -632,14 +632,32 @@ def populate_cpu(data_frame, name_list, csv_name):
     account_list.append('app') 
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
     account_list.insert(0, "Run Name")
+    account_list.insert(0, "App")
     data_frame = pd.DataFrame([], columns=account_list)
 
+    data_frame = data_frame.append({"App": "Sponza"}, ignore_index=True, sort=False)
+    counter = 0
     for run_name in tqdm(name_list):
+        if counter == 3 or counter == 6 or counter == 9:
+            data_frame = data_frame.append({}, ignore_index=True, sort=False)
+            if "materials" in run_name:
+                data_frame = data_frame.append({"App": "Materials"}, ignore_index=True, sort=False)
+            if "platformer" in run_name:
+                data_frame = data_frame.append({"App": "Platformer"}, ignore_index=True, sort=False)
+            if "demo" in run_name:
+                data_frame = data_frame.append({"App": "Demo"}, ignore_index=True, sort=False)
+
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
         account_names = ts.index.levels[0]
 
-        values = {"Run Name": run_name}
+        if "jetsonlp" in run_name:
+            values = {"App": "", "Run Name": "Jetson-lp"}
+        if "jetsonhp" in run_name:
+            values = {"App": "", "Run Name": "Jetson-hp"}
+        if "desktop" in run_name:
+            values = {"App": "", "Run Name": "Desktop"}
+
         ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
         for idx, name in enumerate(account_names):
             if name in ignore_list:
@@ -650,13 +668,14 @@ def populate_cpu(data_frame, name_list, csv_name):
         values.update({"Application": summaries["cpu_time_duration_sum"]['app']})
 
         data_frame = data_frame.append(values, ignore_index=True, sort=False)
+        counter += 1
         # from IPython import embed; embed()
 
     data_frame.to_csv(csv_name, index=False)
 
 # Components on the X
 # Each run on the Y
-# populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
 
 def populate_gpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -665,14 +684,32 @@ def populate_gpu(data_frame, name_list, csv_name):
     account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
     account_list.insert(0, "Run Name")
+    account_list.insert(0, "App")
     data_frame = pd.DataFrame([], columns=account_list)
 
+    data_frame = data_frame.append({"App": "Sponza"}, ignore_index=True, sort=False)
+    counter = 0
     for run_name in tqdm(name_list):
+        if counter == 3 or counter == 6 or counter == 9:
+            data_frame = data_frame.append({}, ignore_index=True, sort=False)
+            if "materials" in run_name:
+                data_frame = data_frame.append({"App": "Materials"}, ignore_index=True, sort=False)
+            if "platformer" in run_name:
+                data_frame = data_frame.append({"App": "Platformer"}, ignore_index=True, sort=False)
+            if "demo" in run_name:
+                data_frame = data_frame.append({"App": "Demo"}, ignore_index=True, sort=False)
+
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
         account_names = ts.index.levels[0]
 
-        values = {"Run Name": run_name}
+        if "jetsonlp" in run_name:
+            values = {"App": "", "Run Name": "Jetson-lp"}
+        if "jetsonhp" in run_name:
+            values = {"App": "", "Run Name": "Jetson-hp"}
+        if "desktop" in run_name:
+            values = {"App": "", "Run Name": "Desktop"}
+            
         name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
         for idx, name in enumerate(name_list):
 
@@ -680,26 +717,44 @@ def populate_gpu(data_frame, name_list, csv_name):
             values.update({formatted_name: summaries["gpu_time_duration_sum"][name]})
 
         data_frame = data_frame.append(values, ignore_index=True, sort=False)
+        counter += 1
         # from IPython import embed; embed()
 
     data_frame.to_csv(csv_name, index=False)
 
 # Components on the X
 # Each run on the Y
-# populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
 
 def populate_power(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
     account_names = ts.index.levels[0]
-    account_list = ['GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power']
-    account_list.insert(0, "Run Name")
+    account_list = ['App', 'Run Name', 'GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power']
     data_frame = pd.DataFrame([], columns=account_list)
 
+    data_frame = data_frame.append({"": "Sponza"}, ignore_index=True, sort=False)
+    counter = 0
     for run_name in tqdm(name_list):
+        if counter == 3 or counter == 6 or counter == 9:
+            data_frame = data_frame.append({}, ignore_index=True, sort=False)
+            if "materials" in run_name:
+                data_frame = data_frame.append({"App": "Materials"}, ignore_index=True, sort=False)
+            if "platformer" in run_name:
+                data_frame = data_frame.append({"App": "Platformer"}, ignore_index=True, sort=False)
+            if "demo" in run_name:
+                data_frame = data_frame.append({"App": "Demo"}, ignore_index=True, sort=False)
+
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
         account_names = ts.index.levels[0]
+
+        if "jetsonlp" in run_name:
+            formatted_run_name = "Jetson-lp"
+        if "jetsonhp" in run_name:
+            formatted_run_name = "Jetson-hp"
+        if "desktop" in run_name:
+            formatted_run_name = "Desktop"
 
         if len(power_data) == 3:
             gpu_power = power_data[0]
@@ -707,10 +762,10 @@ def populate_power(data_frame, name_list, csv_name):
             cpu_energy = power_data[2]
 
             cpu_power = cpu_energy / cpu_time
-            values = {"Run Name": run_name, "GPU Power": gpu_power, "CPU Power": cpu_power}
+            values = {"App": "", "Run Name": formatted_run_name, "GPU Power": gpu_power, "CPU Power": cpu_power}
             data_frame = data_frame.append(values, ignore_index=True, sort=False)
         else:
-            values = {"Run Name": run_name, 'GPU Power': power_data[1], 'DDR Power': power_data[2], 'CPU Power': power_data[3], 'SOC Power': power_data[4], 'SYS Power': power_data[5]}
+            values = {"App": "", "Run Name": formatted_run_name, 'GPU Power': power_data[1], 'DDR Power': power_data[2], 'CPU Power': power_data[3], 'SOC Power': power_data[4], 'SYS Power': power_data[5]}
             data_frame = data_frame.append(values, ignore_index=True, sort=False)
 
         # from IPython import embed; embed()
