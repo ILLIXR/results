@@ -353,7 +353,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
             timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
             imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
-            camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
+            #camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
             try:
                 # try...except for "backwards compatibility reasons"
                 m2p                = read_illixr_table(metrics_path, "m2p"                     , ["iteration_no"])
@@ -436,7 +436,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
                 set_account_name(switchboard_check_qs, "runtime check_qs"),
                 reindex(set_account_name(stdout_cpu_timer)),
                 set_account_name(timewarp_gpu, "timewarp_gl gpu"),
-                set_account_name(camera_cvtfmt, "camera_cvtfmt"),
+                #set_account_name(camera_cvtfmt, "camera_cvtfmt"),
                 set_account_name(stdout_gpu_timer, " gpu", None),
             ])).sort_index()
             ts = pd.concat([ts, stdout_cpu_timer2]).sort_index()
