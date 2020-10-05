@@ -359,12 +359,15 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             try:
                 # try...except for "backwards compatibility reasons"
                 mtp                = read_illixr_table(metrics_path, "mtp_record"              , ["iteration_no"])
+                if "mtp" not in mtp or "ptd" not in mtp:
+                    raise NotImplementedError
             except Exception:
                 warnings.warn("Using fake data for mtp")
                 mtp = pd.DataFrame.from_dict(dict(
                     iteration_no=[0, 1, 2],
-                    vsync=[100e6, 200e6, 300e6],
-                    imu_time=[90e6, 180e6, 175e6],
+                    mtp=[10e6, 20e6, 14e6],
+                    ptd=[5e6, 4e6, 4e6],
+                    vsync=[1e9, 1.1e9, 1.2e9],
                 ))
 
             # This is an integer in SQLite, because no bool in SQLite.
@@ -530,10 +533,10 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-        mtp["mtp"] = (mtp["vsync"] - mtp["imu_time"]) / 1e6
+        mtp["mtp"] = mtp["mtp"] / 1e6
+        mtp["ptd"] = mtp["ptd"] / 1e6
         mtp["wall_time"] = (mtp["vsync"] - mtp["vsync"].iloc[0]) / 1e6
         del mtp["vsync"]
-        del mtp["imu_time"]
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp
 
@@ -620,10 +623,10 @@ def populate_fps(data_frame, name_list, csv_name):
         data_frame[run_name] = values
         data_frame.to_csv(csv_name, index=False)
     
-populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
-populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
-populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
-populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
+# populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
+# populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
+# populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
+# populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
 def populate_cpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -658,7 +661,7 @@ def populate_cpu(data_frame, name_list, csv_name):
 
 # Components on the X
 # Each run on the Y
-populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+# populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
 
 def populate_gpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -688,7 +691,7 @@ def populate_gpu(data_frame, name_list, csv_name):
 
 # Components on the X
 # Each run on the Y
-populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+# populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
 
 def populate_power(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -721,12 +724,13 @@ def populate_power(data_frame, name_list, csv_name):
 
     data_frame.to_csv(csv_name, index=False)
 
-populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
+# populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
 
 def populate_mtp(name_list: List[str]) -> None:
     for run_name in tqdm(name_list):
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
+        assert 'ptd' in mtp
         mtp.to_csv(metrics_path / "mtp.csv", index=False)
 
 populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
@@ -754,10 +758,10 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
-write_graphs(
-    sponza_list + materials_list + platformer_list + demo_list,
-    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
-)
+# write_graphs(
+#     sponza_list + materials_list + platformer_list + demo_list,
+#     ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
+# )
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
