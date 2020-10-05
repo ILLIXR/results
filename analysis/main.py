@@ -745,8 +745,8 @@ def write_graphs(
         fig = plt.figure()
         ax = fig.subplots()
         for account in set(accounts) - set(ignore_accounts):
-            xs = (ts.loc[account, "wall_time_start"] - ts.loc[account, "wall_time_start"].iloc[0]) / 1e9
-            ys = ts.loc[account, "wall_time_duration"] / 1e6
+            xs = (ts.loc[account, "wall_time_start"] - ts.loc[account, "wall_time_start"].iloc[0]) / 1e3
+            ys = ts.loc[account, "wall_time_duration"]
             ax.plot(xs, ys, label=account)
             ax.set_xlabel("Time (seconds after program start)")
             ax.set_ylabel("Wall-time Duration (ms)")
@@ -756,7 +756,7 @@ def write_graphs(
 
 write_graphs(
     sponza_list + materials_list + platformer_list + demo_list,
-    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
+    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
 )
 
     # # Stacked Energy Graphs
