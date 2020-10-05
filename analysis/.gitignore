@@ -1,1 +1,4 @@
 .cache/
+*csv
+*swp
+*swo
