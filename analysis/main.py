@@ -614,10 +614,10 @@ def populate_fps(data_frame, name_list, csv_name):
         data_frame[run_name] = values
         data_frame.to_csv(csv_name, index=False)
     
-# populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
-# populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
-# populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
-# populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
+populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
+populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
+populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
+populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
 def populate_cpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -652,7 +652,7 @@ def populate_cpu(data_frame, name_list, csv_name):
 
 # Components on the X
 # Each run on the Y
-# populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
 
 def populate_gpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
