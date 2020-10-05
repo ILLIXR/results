@@ -727,7 +727,7 @@ def populate_mtp(name_list: List[str]) -> None:
     for run_name in tqdm(name_list):
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
-        mtp.to_csv(metrics_path / "mtp.csv", index=False)
+        mtp.to_csv(metrics_path / f"{run_name}-mtp.csv", index=False)
 
 populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
