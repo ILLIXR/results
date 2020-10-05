@@ -321,26 +321,28 @@ def reindex(ts: pd.DataFrame, accounts: Optional[List[str]] = None) -> pd.DataFr
     )
 
 def read_illixr_power(metrics_path: str):
-    read_perf_cmd = "cat {}/perf-results.txt | grep 'energy-pkg\|energy-ram\|seconds' | sed 's/[^0-9.]*//g'".format(metrics_path)
-
-    res = subprocess.run(read_perf_cmd, shell=True, stdout=subprocess.PIPE)
-    perf_res = res.stdout.splitlines()
-    perf_energy = float(perf_res[0]) + float(perf_res[1])
-    perf_time = float(perf_res[2])
-
-    read_nvidia_cmd = 'cat {}/nvidia-smi.txt | grep -A 5 "Power Readings" | grep "Power Draw" | sed \'s/[^0-9.]*//g\''.format(metrics_path)
-
-    res = subprocess.run(read_perf_cmd, shell=True, stdout=subprocess.PIPE)
-    nvidia_res = res.stdout.splitlines()
-    nvidia_power = sum([float(val) for val in nvidia_res])
-    return nvidia_power, perf_time, perf_energy
+    if not Path(metrics_path + "/perf-results.txt").exists():
+        ## get jetson data
+        read_pp_cmd = "cat {}/output.log | grep -A5 'Power' | sed 's/[^0-9.]*//g'".format(metrics_path)
+        res = subprocess.run(read_pp_cmd, shell=True, stdout=subprocess.PIPE)
+        pp_res = res.stdout.splitlines()
+        return [float(val)/1000.0 for val in pp_res]
+    else:
+        read_perf_cmd = "cat {}/perf-results.txt | grep 'energy-pkg\|energy-ram\|seconds' | sed 's/[^0-9.]*//g'".format(metrics_path)
+        res = subprocess.run(read_perf_cmd, shell=True, stdout=subprocess.PIPE)
+        perf_res = res.stdout.splitlines()
+        perf_energy = float(perf_res[0]) + float(perf_res[1])
+        perf_time = float(perf_res[2])
+        read_nvidia_cmd = 'cat {}/nvidia-smi.txt | grep -A 5 "Power Readings" | grep "Power Draw" | sed \'s/[^0-9.]*//g\''.format(metrics_path)
+        res = subprocess.run(read_nvidia_cmd, shell=True, stdout=subprocess.PIPE)
+        nvidia_res = res.stdout.splitlines()
+        # print(nvidia_res)
+        nvidia_power = sum([float(val) for val in nvidia_res])/len(nvidia_res)
+        return (nvidia_power, perf_time, perf_energy)
 
 @ch_time_block.decor(print_start=False, print_args=True)
 def get_data(metrics_path: Path) -> Tuple[Any]:
-    #gpu_power, cpu_time, cpu_energy = read_illixr_power(str(metrics_path))
-    gpu_power = 0
-    cpu_time = 0
-    cpu_energy = 0
+    power_data = read_illixr_power(str(metrics_path))
 
     with warnings.catch_warnings(record=True) as warnings_log:
         with ch_time_block.ctx("load sqlite", print_start=False):
@@ -351,7 +353,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
             timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
             imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
-            #camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
+            camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
             try:
                 # try...except for "backwards compatibility reasons"
                 m2p                = read_illixr_table(metrics_path, "m2p"                     , ["iteration_no"])
@@ -434,7 +436,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
                 set_account_name(switchboard_check_qs, "runtime check_qs"),
                 reindex(set_account_name(stdout_cpu_timer)),
                 set_account_name(timewarp_gpu, "timewarp_gl gpu"),
-                #set_account_name(camera_cvtfmt, "camera_cvtfmt"),
+                set_account_name(camera_cvtfmt, "camera_cvtfmt"),
                 set_account_name(stdout_gpu_timer, " gpu", None),
             ])).sort_index()
             ts = pd.concat([ts, stdout_cpu_timer2]).sort_index()
@@ -525,9 +527,9 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p
+        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p
 
-#@ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
+# @ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
@@ -535,226 +537,311 @@ def get_data_cached(metrics_path: Path) -> Tuple[Any]:
 run_list = [
     path.name.partition("-")[2]
     for path in list(Path("..").iterdir())
-    if path.name.startswith("metrics-")
+    if path.name.endswith("metrics-")
 ]
-for run_name in tqdm(run_list):
-    tqdm.write(f"Graphs for {run_name}")
-    metrics_path = Path("..") / f"metrics-{run_name}"
 
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, gpu_power, cpu_time, cpu_energy, m2p = get_data_cached(metrics_path)
+sponza_list = [
+    "metrics-jetsonlp-sponza",
+    "metrics-jetsonhp-sponza",
+    "metrics-desktop-sponza",
+]
+materials_list = [
+    "metrics-jetsonlp-materials",
+    "metrics-jetsonhp-materials",
+    "metrics-desktop-materials",
+]
+platformer_list = [
+    "metrics-jetsonlp-platformer",
+    "metrics-jetsonhp-platformer",
+    "metrics-desktop-platformer",
+]
+demo_list = [
+    "metrics-jetsonlp-demo",
+    "metrics-jetsonhp-demo",
+    "metrics-desktop-demo",
+]
 
+fps_spreadsheet_sponza = pd.DataFrame()
+fps_spreadsheet_materials = pd.DataFrame() 
+fps_spreadsheet_platformer = pd.DataFrame() 
+fps_spreadsheet_demo = pd.DataFrame() 
+
+power_spreadsheet = pd.DataFrame() 
+cpu_spreadsheet = pd.DataFrame() 
+gpu_spreadsheet = pd.DataFrame() 
+timeseries_spreadsheet = pd.DataFrame() 
+
+replaced_names = {
+    'app': 'Application',
+    'zed_imu_thread iter': 'IMU',
+    'zed_camera_thread iter': 'Camera',
+    'timewarp_gl iter': 'Reprojection',
+    'hologram iter': 'Hologram',
+    'audio_encoding iter': 'Encoding',
+    'audio_decoding iter': 'Playback',
+
+    # GPU Values
+    'timewarp_gl gpu': 'Reprojection',
+    'hologram': 'Hologram',
+}
+
+def populate_fps(data_frame, name_list, csv_name):
+    metrics_path = Path("..") / f"{name_list[0]}"
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
     account_names = ts.index.levels[0]
-
-    output_path = Path("..") / f"output-{run_name}"
-    output_path.mkdir(exist_ok=True)
-    with (output_path / "account_summaries.md").open("w") as f:
-        f.write("# Summaries\n\n")
-        columns = ["count"] + [col for col in summaries.columns if col != "count"]
-        floatfmt = ["", ".0f", ".1f", ".1f"] + list_concat(["e", "e", "e"] for clock in clocks)
-        f.write(summaries[columns].to_markdown(floatfmt=floatfmt))
-        f.write("\n\n")
-        f.write("# Totals\n\n")
-        f.write(summaries[["cpu_time_duration_sum", "gpu_time_duration_sum"]].sum().to_markdown())
-        f.write("\n\n")
-        f.write("# Thread IDs (of long-running threads)\n\n")
-        f.write(thread_ids.sort_values(["name", "sub_name"]).to_markdown())
-        f.write("\n\n")
-        f.write("# Switchboard topic stops\n\n")
-        f.write(switchboard_topic_stop.to_markdown(floatfmt=["", ".0f", ".0f", ".2f"]))
-        f.write("\n\n")
-        f.write("# Notes\n\n")
-        f.write("- All times are in milliseconds unless otherwise mentioned.\n")
-        f.write("- Total wall runtime = {:.1f} sec\n".format(
-            (ts.loc["timewarp_gl iter", "wall_time_stop"].max() - ts.loc["timewarp_gl iter", "wall_time_start"].min()) / 1e3
-        ))
-        f.write("\n\n")
-        f.write("# Warnings\n\n")
-        for warning in warnings_log:
-            f.write(f"- {warning.filename}:{warning.lineno} {warning.message}\n\n")
-        f.write("\n\n")
-        columns = ["period"] + [col for col in ts.columns if col != "period"]
-        for account_name in account_names:
-            f.write(f"# {account_name}\n\n")
-            df = ts.loc[account_name]
-            f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
-            f.write("\n\n")
-
-    replaced_names = {
-        'app': 'Application',
-        'zed_imu_thread iter': 'IMU',
-        'zed_camera_thread iter': 'Camera',
-        'timewarp_gl iter': 'Reprojection',
-        'hologram iter': 'Hologram',
-        'audio_encoding iter': 'Encoding',
-        'audio_decoding iter': 'Playback',
-
-        # GPU Values
-        'timewarp_gl gpu': 'Reprojection',
-        'hologram': 'Hologram',
-    }
-
-    # Stacked graphs
-    total_cpu_time = 0.0
-    plt.rcParams.update({'font.size': 8})
-
-    # App is only in this list because we want to make it appear at the top of the graph
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    for account_name in account_names:
-        if account_name in ignore_list:
-            continue
-        total_cpu_time += summaries["cpu_time_duration_sum"][account_name]
-    total_cpu_time += summaries["cpu_time_duration_sum"]['app']
-
-    width = 0.4
-    bar_plots = []
-    rolling_sum = 0.0
-    for idx, name in enumerate(account_names):
-        if name in ignore_list:
-            continue
-
-        bar_height = summaries["cpu_time_duration_sum"][name]
-        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-        rolling_sum += bar_height
-
-    # This is only because we want the app section at the top
-    bar_height = summaries["cpu_time_duration_sum"]['app']
-    bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-    rolling_sum += bar_height
-
-    plt.title('CPU Time Breakdown Per Run')
-    plt.xticks(np.arange(0, 1, step=1))
-
-    plt.yticks(np.arange(0, rolling_sum+1, rolling_sum / 10))
-    plt.ylabel('Total CPU Time')
-
-    plt.subplots_adjust(right=0.7)
     account_list = [name for name in account_names if name not in ignore_list]
-    account_list.append('app')
+    account_list.append('app') 
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
+    data_frame["Components"] = account_list
 
-    plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    plt.xlabel("Full System")
-    plt.savefig(output_path / "stacked.png")
-    plt.close()
+    for run_name in tqdm(name_list):
+        metrics_path = Path("..") / f"{run_name}"
+        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+        account_names = ts.index.levels[0]
 
-    # GPU Stacked
-    gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
-    total_gpu_time = 0.0
-    for account_name in account_names:
-        if account_name not in gpu_list:
-            continue
-        total_gpu_time += summaries["gpu_time_duration_sum"][account_name]
+        values = []
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
+        for idx, name in enumerate(account_names):
+            if name in ignore_list:
+                continue
 
-    plt.clf()
-    width = 0.4
-    bar_plots = []
+            values.append(summaries["period_mean"][name])
+        values.append(summaries["period_mean"]['app'])
 
-    app_num = summaries["gpu_time_duration_sum"]["app_gpu1"] + summaries["gpu_time_duration_sum"]["app_gpu2"]
-    bar_plots.append(plt.bar(1, summaries["gpu_time_duration_sum"]["hologram"], width=width, bottom=0, color="brown")[0])
-    bar_plots.append(plt.bar(1, summaries["gpu_time_duration_sum"]["timewarp_gl gpu"], width=width, bottom=summaries["gpu_time_duration_sum"]["hologram"])[0])
-    bar_plots.append(plt.bar(1, app_num, width=width, bottom=summaries["gpu_time_duration_sum"]["timewarp_gl gpu"] + summaries["gpu_time_duration_sum"]["hologram"])[0])
+        data_frame[run_name] = values
+        data_frame.to_csv(csv_name, index=False)
+    
+# populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
+# populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
+# populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
+# populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
-    plt.title('GPU Time Breakdown Per Run')
-    plt.xticks(np.arange(0, 1, step=1))
-
-    rolling_sum = app_num + summaries["gpu_time_duration_sum"]["timewarp_gl gpu"] + summaries["gpu_time_duration_sum"]["hologram"]
-    plt.yticks(np.arange(0, rolling_sum+1, rolling_sum/10))
-    plt.ylabel('Total GPU Time')
-
-    plt.subplots_adjust(right=0.7)
-    account_list = ['Hologram', 'Reprojection', 'Application']
+def populate_cpu(data_frame, name_list, csv_name):
+    metrics_path = Path("..") / f"{name_list[0]}"
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+    account_names = ts.index.levels[0]
+    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
+    account_list = [name for name in account_names if name not in ignore_list]
+    account_list.append('app') 
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
+    account_list.insert(0, "Run Name")
+    data_frame = pd.DataFrame([], columns=account_list)
 
-    plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    plt.xlabel("Full System")
-    plt.savefig(output_path / "stacked_gpu.png")
-    plt.close()
+    for run_name in tqdm(name_list):
+        metrics_path = Path("..") / f"{run_name}"
+        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+        account_names = ts.index.levels[0]
+
+        values = {"Run Name": run_name}
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
+        for idx, name in enumerate(account_names):
+            if name in ignore_list:
+                continue
+
+            formatted_name = replaced_names[name] if name in replaced_names else name
+            values.update({formatted_name: summaries["cpu_time_duration_sum"][name]})
+        values.update({"Application": summaries["cpu_time_duration_sum"]['app']})
+
+        data_frame = data_frame.append(values, ignore_index=True, sort=False)
+        # from IPython import embed; embed()
+
+    data_frame.to_csv(csv_name, index=False)
+
+# Components on the X
+# Each run on the Y
+# populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+
+def populate_gpu(data_frame, name_list, csv_name):
+    metrics_path = Path("..") / f"{name_list[0]}"
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+    account_names = ts.index.levels[0]
+    account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
+    account_list.insert(0, "Run Name")
+    data_frame = pd.DataFrame([], columns=account_list)
+
+    for run_name in tqdm(name_list):
+        metrics_path = Path("..") / f"{run_name}"
+        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+        account_names = ts.index.levels[0]
+
+        values = {"Run Name": run_name}
+        name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+        for idx, name in enumerate(name_list):
+
+            formatted_name = replaced_names[name] if name in replaced_names else name
+            values.update({formatted_name: summaries["gpu_time_duration_sum"][name]})
+
+        data_frame = data_frame.append(values, ignore_index=True, sort=False)
+        # from IPython import embed; embed()
+
+    data_frame.to_csv(csv_name, index=False)
+
+# Components on the X
+# Each run on the Y
+# populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+
+def populate_power(data_frame, name_list, csv_name):
+    metrics_path = Path("..") / f"{name_list[0]}"
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+    account_names = ts.index.levels[0]
+    account_list = ['GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power']
+    account_list.insert(0, "Run Name")
+    data_frame = pd.DataFrame([], columns=account_list)
+
+    for run_name in tqdm(name_list):
+        metrics_path = Path("..") / f"{run_name}"
+        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
+        account_names = ts.index.levels[0]
+
+        if len(power_data) == 3:
+            gpu_power = power_data[0]
+            cpu_time = power_data[1]
+            cpu_energy = power_data[2]
+
+            cpu_power = cpu_energy / cpu_time
+            values = {"Run Name": run_name, "GPU Power": gpu_power, "CPU Power": cpu_power}
+            data_frame = data_frame.append(values, ignore_index=True, sort=False)
+        else:
+            values = {"Run Name": run_name, 'GPU Power': power_data[1], 'DDR Power': power_data[2], 'CPU Power': power_data[3], 'SOC Power': power_data[4], 'SYS Power': power_data[5]}
+            data_frame = data_frame.append(values, ignore_index=True, sort=False)
+
+        # from IPython import embed; embed()
+
+    data_frame.to_csv(csv_name, index=False)
+
+populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
 
     # # Stacked Energy Graphs
-    # plt.clf()
-    # gpu_energy = gpu_power * cpu_time
-    # total_energy = cpu_energy + gpu_energy
-    # width = 0.4
-    # bar_plots = []
+    # if len(power_data) == 3:
+    #     gpu_power = power_data[0]
+    #     cpu_time = power_data[1]
+    #     cpu_energy = power_data[2]
+    #     # # Stacked Energy Graphs Desktop
+    #     plt.clf()
+    #     gpu_energy = gpu_power * cpu_time
+    #     total_energy = cpu_energy + gpu_energy
+    #     print(gpu_energy)
+    #     print(cpu_energy)
+    #     width = 0.4
+    #     bar_plots = []
+    #     bar_plots.append(plt.bar(1, cpu_energy, width=width, bottom=0)[0])
+    #     bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy)[0])
+    #     plt.title('Energy Breakdown Per Run')
+    #     plt.xticks(np.arange(0, 1, step=1))
+    #     plt.yticks(np.arange(0, total_energy+1, total_energy/10))
+    #     plt.ylabel('Percent of Total Energy')
+    #     plt.subplots_adjust(right=0.7)
+    #     plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    #     plt.xlabel("Full System")
+    #     plt.savefig(output_path / "stacked_energy.png")
+    #     # # Stacked Power Graphs Desktop
+    #     plt.clf()
+    #     cpu_power = cpu_energy / cpu_time
+    #     total_power = cpu_power + gpu_power
+    #     width = 0.4
+    #     bar_plots = []
+    #     bar_plots.append(plt.bar(1, cpu_power, width=width, bottom=0)[0])
+    #     bar_plots.append(plt.bar(1, gpu_power, width=width, bottom= cpu_power)[0])
+    #     plt.title('Power Breakdown Per Run')
+    #     plt.xticks(np.arange(0, 1, step=1))
+    #     plt.yticks(np.arange(0, total_power+1, total_power/10))
+    #     plt.ylabel('Percent of Total Power')
+    #     plt.subplots_adjust(right=0.7)
+    #     plt.legend([x for x in bar_plots], ['CPU Power', 'GPU Power'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    #     plt.xlabel("Full System")
+    #     plt.savefig(output_path / "stacked_power.png")
+    # else:
+    #     # # Stacked Power Graphs Jetson
+    #     plt.clf()
+    #     total_power = power_data[0]
+    #     width = 0.4
+    #     bar_plots = []
+    #     bar_plots.append(plt.bar(1, power_data[1], width=width, bottom=0)[0])
+    #     bar_plots.append(plt.bar(1, power_data[2], width=width, bottom= power_data[1])[0])
+    #     bar_plots.append(plt.bar(1, power_data[3], width=width, bottom= power_data[1] + power_data[2])[0])
+    #     bar_plots.append(plt.bar(1, power_data[4], width=width, bottom= power_data[1] + power_data[2] + power_data[3])[0])
+    #     bar_plots.append(plt.bar(1, power_data[5], width=width, bottom= power_data[1] + power_data[2] + power_data[3] + power_data[4])[0])
+    #     plt.title('Power Breakdown Per Run')
+    #     plt.xticks(np.arange(0, 1, step=1))
+    #     plt.yticks(np.arange(0, total_power+1, total_power/10))
+    #     plt.ylabel('Percent of Total Power')
+    #     plt.subplots_adjust(right=0.7)
+    #     plt.legend([x for x in bar_plots], ['GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    #     plt.xlabel("Full System")
+    #     plt.savefig(output_path / "stacked_power.png")
+    #     print(power_data[1])
+    #     print(power_data[2])
+    #     print(power_data[3])
+    #     print(power_data[4])
+    #     print(power_data[5])
 
-    # bar_plots.append(plt.bar(1, cpu_energy/total_energy, width=width, bottom=0)[0])
-    # bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy/total_energy)[0])
-
-    # plt.title('Energy Breakdown Per Run')
-    # plt.xticks(np.arange(0, 1, step=1))
-
-    # plt.yticks(np.arange(0, 1.01, .1))
-    # plt.ylabel('Percent of Total Energy')
-
-    # plt.subplots_adjust(right=0.7)
-    # plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    # plt.xlabel("Full System")
-    # plt.savefig(output_path / "stacked_energy.png")
     # import IPython; IPython.embed()
 
     # Overlayed graphs
-    f = plt.figure()
-    f.tight_layout(pad=2.0)
-    plt.rcParams.update({'font.size': 8})
-    # plot the same data on both axes
-    ax = f.gca()
-    ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime', 'camera_cvtfmt', 'zed_imu_thread iter', 'OpenVINS IMU', 'camera_cvtfmt']
-    for i, account_name in enumerate(account_names):
-        if account_name in ignore_list:
-            continue
-        x_data = ts.loc[account_name, "wall_time_start"].copy()
-        y_data = ts.loc[account_name, "cpu_time_duration"].copy()
-        if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
-            x_data.drop(x_data.index[0], inplace=True)
-            y_data.drop(y_data.index[0], inplace=True)
-        if account_name in replaced_names:
-            ax.plot(x_data, y_data, label=replaced_names[account_name])
-        else:
-            ax.plot(x_data, y_data, label=account_name)
+    # f = plt.figure()
+    # f.tight_layout(pad=2.0)
+    # plt.rcParams.update({'font.size': 8})
+    # # plot the same data on both axes
+    # ax = f.gca()
+    # ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime', 'camera_cvtfmt', 'zed_imu_thread iter', 'OpenVINS IMU', 'camera_cvtfmt']
+    # for i, account_name in enumerate(account_names):
+    #     if account_name in ignore_list:
+    #         continue
+    #     x_data = ts.loc[account_name, "wall_time_start"].copy()
+    #     y_data = ts.loc[account_name, "cpu_time_duration"].copy()
+    #     if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
+    #         x_data.drop(x_data.index[0], inplace=True)
+    #         y_data.drop(y_data.index[0], inplace=True)
+    #     if account_name in replaced_names:
+    #         ax.plot(x_data, y_data, label=replaced_names[account_name])
+    #     else:
+    #         ax.plot(x_data, y_data, label=account_name)
 
-        ax.set_title(f"{account_name} CPU Time Timeseries")
-        ax.set(ylabel='CPU Time (ms)')
-    plt.xlabel("Timestamp (ms)")
-    plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    plt.subplots_adjust(right=0.6)
-    plt.yscale("log")
-    plt.savefig(output_path / "overlayed.png")
-    plt.close()
+    #     ax.set_title(f"{account_name} CPU Time Timeseries")
+    #     ax.set(ylabel='CPU Time (ms)')
+    # plt.xlabel("Timestamp (ms)")
+    # plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    # plt.subplots_adjust(right=0.6)
+    # plt.yscale("log")
+    # plt.savefig(output_path / "overlayed.png")
+    # plt.close()
     # import IPython; IPython.embed()
 
-    # Individual graphs
-    ts_dir = output_path / "ts"
-    ts_dir.mkdir(exist_ok=True)
-    for i, account_name in enumerate(account_names):
-        if account_name in ignore_list:
-            continue
-        f = plt.figure()
-        f.tight_layout(pad=2.0)
-        plt.rcParams.update({'font.size': 8})
-        # plot the same data on both axes
-        x_data = ts.loc[account_name, "wall_time_start"].copy()
-        y_data = ts.loc[account_name, "cpu_time_duration"].copy()
-        if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
-            x_data.drop(x_data.index[0], inplace=True)
-            y_data.drop(y_data.index[0], inplace=True)
-        ax = f.gca()
-        ax.plot(x_data, y_data)
-        ax.set_title(f"{account_name} CPU Time Timeseries")
-        ax.set(ylabel='CPU Time (ms)')
-        plt.xlabel("Timestamp (ms)")
-        plt.yscale("log")
-        plt.savefig(ts_dir / f"{account_name}.png")
-        plt.close()
+    # # Individual graphs
+    # ts_dir = output_path / "ts"
+    # ts_dir.mkdir(exist_ok=True)
+    # for i, account_name in enumerate(account_names):
+    #     if account_name in ignore_list:
+    #         continue
+    #     f = plt.figure()
+    #     f.tight_layout(pad=2.0)
+    #     plt.rcParams.update({'font.size': 8})
+    #     # plot the same data on both axes
+    #     x_data = ts.loc[account_name, "wall_time_start"].copy()
+    #     y_data = ts.loc[account_name, "cpu_time_duration"].copy()
+    #     if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
+    #         x_data.drop(x_data.index[0], inplace=True)
+    #         y_data.drop(y_data.index[0], inplace=True)
+    #     ax = f.gca()
+    #     ax.plot(x_data, y_data)
+    #     ax.set_title(f"{account_name} CPU Time Timeseries")
+    #     ax.set(ylabel='CPU Time (ms)')
+    #     plt.xlabel("Timestamp (ms)")
+    #     plt.yscale("log")
+    #     plt.savefig(ts_dir / f"{account_name}.png")
+    #     plt.close()
 
-    # import IPython; IPython.embed()
-    # print(summaries["cpu_time_duration_sum"].to_csv())
+    # # import IPython; IPython.embed()
+    # # print(summaries["cpu_time_duration_sum"].to_csv())
 
-    fig = plt.figure()
-    ax = plt.gca()
-    ys = (m2p["vsync"] - m2p["imu_time"]) / 1e6
-    xs = (m2p["vsync"] - m2p["vsync"].iloc[0]) / 1e9
-    ax.plot(xs, ys)
-    ax.set_xlabel("Time since application start (sec)")
-    ax.set_ylabel("Motion-to-photon (ms)")
-    fig.savefig(output_path / "m2p.png")
-    plt.close(fig)
+    # fig = plt.figure()
+    # ax = plt.gca()
+    # ys = (m2p["vsync"] - m2p["imu_time"]) / 1e6
+    # xs = (m2p["vsync"] - m2p["vsync"].iloc[0]) / 1e9
+    # ax.plot(xs, ys)
+    # ax.set_xlabel("Time since application start (sec)")
+    # ax.set_ylabel("Motion-to-photon (ms)")
+    # fig.savefig(output_path / "m2p.png")
+    # plt.close(fig)
