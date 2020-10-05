@@ -338,7 +338,8 @@ def read_illixr_power(metrics_path: str):
         res = subprocess.run(read_nvidia_cmd, shell=True, stdout=subprocess.PIPE)
         nvidia_res = res.stdout.splitlines()
         # print(nvidia_res)
-        nvidia_power = sum([float(val) for val in nvidia_res])/len(nvidia_res)
+        # Ditch the last 70 values (~5 seconds worth) because they correspond to sqlite, not the app
+        nvidia_power = sum([float(val) for val in nvidia_res[:-70]])/len(nvidia_res[:-70])
         return (nvidia_power, perf_time, cpu_energy, ddr_energy)
 
 @ch_time_block.decor(print_start=False, print_args=True)
