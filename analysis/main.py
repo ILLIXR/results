@@ -358,10 +358,10 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             #camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
             try:
                 # try...except for "backwards compatibility reasons"
-                m2p                = read_illixr_table(metrics_path, "m2p"                     , ["iteration_no"])
+                mtp                = read_illixr_table(metrics_path, "mtp_record"              , ["iteration_no"])
             except Exception:
-                warnings.warn("Using fake data for m2p")
-                m2p = pd.DataFrame.from_dict(dict(
+                warnings.warn("Using fake data for mtp")
+                mtp = pd.DataFrame.from_dict(dict(
                     iteration_no=[0, 1, 2],
                     vsync=[100e6, 200e6, 300e6],
                     imu_time=[90e6, 180e6, 175e6],
@@ -529,7 +529,12 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p
+        mtp["mtp"] = (mtp["vsync"] - mtp["imu_time"]) / 1e6
+        mtp["wall_time"] = (mtp["vsync"] - mtp["vsync"].iloc[0]) / 1e6
+        del mtp["vsync"]
+        del mtp["imu_time"]
+
+        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp
 
 # @ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
@@ -717,6 +722,14 @@ def populate_power(data_frame, name_list, csv_name):
 
 populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
 
+def populate_mtp(name_list: List[str]) -> None:
+    for run_name in tqdm(name_list):
+        metrics_path = Path("..") / f"{run_name}"
+        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
+        mtp.to_csv(metrics_path / "mtp.csv", index=False)
+
+populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
+
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
     #     gpu_power = power_data[0]
@@ -839,13 +852,3 @@ populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list
 
     # # import IPython; IPython.embed()
     # # print(summaries["cpu_time_duration_sum"].to_csv())
-
-    # fig = plt.figure()
-    # ax = plt.gca()
-    # ys = (m2p["vsync"] - m2p["imu_time"]) / 1e6
-    # xs = (m2p["vsync"] - m2p["vsync"].iloc[0]) / 1e9
-    # ax.plot(xs, ys)
-    # ax.set_xlabel("Time since application start (sec)")
-    # ax.set_ylabel("Motion-to-photon (ms)")
-    # fig.savefig(output_path / "m2p.png")
-    # plt.close(fig)
