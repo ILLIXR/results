@@ -331,14 +331,15 @@ def read_illixr_power(metrics_path: str):
         read_perf_cmd = "cat {}/perf-results.txt | grep 'energy-pkg\|energy-ram\|seconds' | sed 's/[^0-9.]*//g'".format(metrics_path)
         res = subprocess.run(read_perf_cmd, shell=True, stdout=subprocess.PIPE)
         perf_res = res.stdout.splitlines()
-        perf_energy = float(perf_res[0]) + float(perf_res[1])
+        cpu_energy = float(perf_res[0])
+        ddr_energy = float(perf_res[1])
         perf_time = float(perf_res[2])
         read_nvidia_cmd = 'cat {}/nvidia-smi.txt | grep -A 5 "Power Readings" | grep "Power Draw" | sed \'s/[^0-9.]*//g\''.format(metrics_path)
         res = subprocess.run(read_nvidia_cmd, shell=True, stdout=subprocess.PIPE)
         nvidia_res = res.stdout.splitlines()
         # print(nvidia_res)
         nvidia_power = sum([float(val) for val in nvidia_res])/len(nvidia_res)
-        return (nvidia_power, perf_time, perf_energy)
+        return (nvidia_power, perf_time, cpu_energy, ddr_energy)
 
 @ch_time_block.decor(print_start=False, print_args=True)
 def get_data(metrics_path: Path) -> Tuple[Any]:
@@ -680,13 +681,13 @@ def populate_gpu(data_frame, name_list, csv_name):
 
 # Components on the X
 # Each run on the Y
-# populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
 
 def populate_power(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
     account_names = ts.index.levels[0]
-    account_list = ['GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power']
+    account_list = ['CPU Power', 'GPU Power', 'DDR Power', 'SOC Power', 'SYS Power']
     account_list.insert(0, "Run Name")
     data_frame = pd.DataFrame([], columns=account_list)
 
@@ -695,13 +696,15 @@ def populate_power(data_frame, name_list, csv_name):
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
         account_names = ts.index.levels[0]
 
-        if len(power_data) == 3:
+        if len(power_data) == 4:
             gpu_power = power_data[0]
             cpu_time = power_data[1]
             cpu_energy = power_data[2]
+            ddr_energy = power_data[3]
 
             cpu_power = cpu_energy / cpu_time
-            values = {"Run Name": run_name, "GPU Power": gpu_power, "CPU Power": cpu_power}
+            ddr_power = ddr_energy / cpu_time
+            values = {"Run Name": run_name, 'GPU Power': gpu_power, 'CPU Power': cpu_power, 'DDR Power': ddr_power}
             data_frame = data_frame.append(values, ignore_index=True, sort=False)
         else:
             values = {"Run Name": run_name, 'GPU Power': power_data[1], 'DDR Power': power_data[2], 'CPU Power': power_data[3], 'SOC Power': power_data[4], 'SYS Power': power_data[5]}
