@@ -378,7 +378,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             stdout_gpu_timer = read_illixr_csv(metrics_path, "gpu_timer", ["account_name", "iteration_no"], ["wall_time_start", "wall_time_stop", "gpu_time_duration"])
             for df in [timewarp_gpu, stdout_gpu_timer]:
                 df["gpu_time_duration"] = pd.to_numeric(df["gpu_time_duration"])
-                splice_mask = df["gpu_time_duration"] > 1e9
+                splice_mask = df["gpu_time_duration"] > 1e10
                 if splice_mask.sum() > 5:
                     warnings.warn(UserWarning(
                         f"gpu_timer had {splice_mask.sum()} splices, which is kind of high."
@@ -494,7 +494,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
             ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
             ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
-            # ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
+            ts.loc["opencv", "wall_time_start"] += ts.loc["slam2 cb cam", "wall_time_start"].iloc[0]
+            ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
 
         with ch_time_block.ctx("rename accounts", print_start=False):
             ts = rename_accounts(ts, {
@@ -729,6 +730,34 @@ def populate_mtp(name_list: List[str]) -> None:
         mtp.to_csv(metrics_path / "mtp.csv", index=False)
 
 populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
+
+
+def write_graphs(
+        name_list: List[str],
+        ignore_accounts=List[str],
+) -> None:
+    for run_name in tqdm(name_list):
+        metrics_path = Path("..") / f"{run_name}"
+        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
+
+        accounts = ts.index.levels[0]
+
+        fig = plt.figure()
+        ax = fig.subplots()
+        for account in set(accounts) - set(ignore_accounts):
+            xs = (ts.loc[account, "wall_time_start"] - ts.loc[account, "wall_time_start"].iloc[0]) / 1e9
+            ys = ts.loc[account, "wall_time_duration"] / 1e6
+            ax.plot(xs, ys, label=account)
+            ax.set_xlabel("Time (seconds after program start)")
+            ax.set_ylabel("Wall-time Duration (ms)")
+        ax.legend()
+        ax.set_title("Wall-Time Duration by Component")
+        fig.savefig(metrics_path / "wall_time_durations.png")
+
+write_graphs(
+    sponza_list + materials_list + platformer_list + demo_list,
+    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
+)
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
