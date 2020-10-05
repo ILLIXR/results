@@ -359,14 +359,15 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             try:
                 # try...except for "backwards compatibility reasons"
                 mtp                = read_illixr_table(metrics_path, "mtp_record"              , ["iteration_no"])
-                if "mtp" not in mtp or "ptd" not in mtp:
+                if "imu_to_display" not in mtp:
                     raise NotImplementedError
             except Exception:
                 warnings.warn("Using fake data for mtp")
                 mtp = pd.DataFrame.from_dict(dict(
                     iteration_no=[0, 1, 2],
-                    mtp=[10e6, 20e6, 14e6],
-                    ptd=[5e6, 4e6, 4e6],
+                    imu_to_display=[10e6, 20e6, 14e6],
+                    predict_to_display=[3e6, 4e6, 4e6],
+                    render_to_display=[5e6, 466, 7e6],
                     vsync=[1e9, 1.1e9, 1.2e9],
                 ))
 
@@ -533,8 +534,9 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 
         summaries["count"] = ts.groupby("account_name")["wall_time_duration"].count()
 
-        mtp["mtp"] = mtp["mtp"] / 1e6
-        mtp["ptd"] = mtp["ptd"] / 1e6
+        mtp["imu_to_display"] = mtp["imu_to_display"] / 1e6
+        mtp["predict_to_display"] = mtp["predict_to_display"] / 1e6
+        mtp["render_to_display"] = mtp["render_to_display"] / 1e6
         mtp["wall_time"] = (mtp["vsync"] - mtp["vsync"].iloc[0]) / 1e6
         del mtp["vsync"]
 
@@ -730,7 +732,6 @@ def populate_mtp(name_list: List[str]) -> None:
     for run_name in tqdm(name_list):
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
-        assert 'ptd' in mtp
         mtp.to_csv(metrics_path / "mtp.csv", index=False)
 
 populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
