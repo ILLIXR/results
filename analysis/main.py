@@ -761,17 +761,10 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
-<<<<<<< HEAD
 write_graphs(
-    sponza_list + materials_list + platformer_list + demo_list,
-    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
+   sponza_list + materials_list + platformer_list + demo_list,
+   ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
 )
-=======
-#write_graphs(
-#    sponza_list + materials_list + platformer_list + demo_list,
-#    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
-#)
->>>>>>> 091c719f99bbee388cab9e83faf251c831af5fa1
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
