@@ -554,24 +554,24 @@ run_list = [
 ]
 
 sponza_list = [
-    "metrics-jetsonlp-sponza",
-    "metrics-jetsonhp-sponza",
-    "metrics-desktop-sponza",
+#   "metrics-jetsonlp-sponza",
+#   "metrics-jetsonhp-sponza",
+#   "metrics-desktop-sponza",
 ]
 materials_list = [
-    "metrics-jetsonlp-materials",
-    "metrics-jetsonhp-materials",
-    "metrics-desktop-materials",
+#   "metrics-jetsonlp-materials",
+#   "metrics-jetsonhp-materials",
+#   "metrics-desktop-materials",
 ]
 platformer_list = [
-    "metrics-jetsonlp-platformer",
-    "metrics-jetsonhp-platformer",
-    "metrics-desktop-platformer",
+#   "metrics-jetsonlp-platformer",
+#   "metrics-jetsonhp-platformer",
+#   "metrics-desktop-platformer",
 ]
 demo_list = [
-    "metrics-jetsonlp-demo",
-    "metrics-jetsonhp-demo",
     "metrics-desktop-demo",
+    "metrics-jetsonhp-demo",
+    "metrics-jetsonlp-demo",
 ]
 
 fps_spreadsheet_sponza = pd.DataFrame()
@@ -625,10 +625,10 @@ def populate_fps(data_frame, name_list, csv_name):
         data_frame[run_name] = values
         data_frame.to_csv(csv_name, index=False)
     
-# populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
-# populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
-# populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
-# populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
+#populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
+#populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
+#populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
+#populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
 def populate_cpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -663,7 +663,7 @@ def populate_cpu(data_frame, name_list, csv_name):
 
 # Components on the X
 # Each run on the Y
-# populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
 
 def populate_gpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -693,7 +693,7 @@ def populate_gpu(data_frame, name_list, csv_name):
 
 # Components on the X
 # Each run on the Y
-# populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
 
 def populate_power(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
@@ -726,13 +726,13 @@ def populate_power(data_frame, name_list, csv_name):
 
     data_frame.to_csv(csv_name, index=False)
 
-# populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
+#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
 
 def populate_mtp(name_list: List[str]) -> None:
     for run_name in tqdm(name_list):
         metrics_path = Path("..") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
-        mtp.to_csv(metrics_path / "mtp.csv", index=False)
+        mtp.to_csv(metrics_path / f"{run_name}-mtp.csv", index=False)
 
 # populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
@@ -750,8 +750,8 @@ def write_graphs(
         fig = plt.figure()
         ax = fig.subplots()
         for account in set(accounts) - set(ignore_accounts):
-            xs = (ts.loc[account, "wall_time_start"] - ts.loc[account, "wall_time_start"].iloc[0]) / 1e9
-            ys = ts.loc[account, "wall_time_duration"] / 1e6
+            xs = (ts.loc[account, "wall_time_start"] - ts.loc[account, "wall_time_start"].iloc[0]) / 1e3
+            ys = ts.loc[account, "wall_time_duration"]
             xs = xs.iloc[10:]
             ys = ys.iloc[10:]
             ax.plot(xs, ys, label=account)
@@ -761,10 +761,17 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
+<<<<<<< HEAD
 write_graphs(
     sponza_list + materials_list + platformer_list + demo_list,
     ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
 )
+=======
+#write_graphs(
+#    sponza_list + materials_list + platformer_list + demo_list,
+#    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
+#)
+>>>>>>> 091c719f99bbee388cab9e83faf251c831af5fa1
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
