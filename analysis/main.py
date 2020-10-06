@@ -734,7 +734,7 @@ def populate_mtp(name_list: List[str]) -> None:
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
         mtp.to_csv(metrics_path / "mtp.csv", index=False)
 
-populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
+# populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
 
 def write_graphs(
@@ -752,6 +752,8 @@ def write_graphs(
         for account in set(accounts) - set(ignore_accounts):
             xs = (ts.loc[account, "wall_time_start"] - ts.loc[account, "wall_time_start"].iloc[0]) / 1e9
             ys = ts.loc[account, "wall_time_duration"] / 1e6
+            xs = xs.iloc[10:]
+            ys = ys.iloc[10:]
             ax.plot(xs, ys, label=account)
             ax.set_xlabel("Time (seconds after program start)")
             ax.set_ylabel("Wall-time Duration (ms)")
@@ -759,10 +761,10 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
-# write_graphs(
-#     sponza_list + materials_list + platformer_list + demo_list,
-#     ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
-# )
+write_graphs(
+    sponza_list + materials_list + platformer_list + demo_list,
+    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app'],
+)
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
