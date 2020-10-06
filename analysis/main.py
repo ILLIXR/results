@@ -569,9 +569,9 @@ platformer_list = [
 #   "metrics-desktop-platformer",
 ]
 demo_list = [
-    "metrics-jetsonlp-demo",
-    "metrics-jetsonhp-demo",
     "metrics-desktop-demo",
+    "metrics-jetsonhp-demo",
+    "metrics-jetsonlp-demo",
 ]
 
 fps_spreadsheet_sponza = pd.DataFrame()
