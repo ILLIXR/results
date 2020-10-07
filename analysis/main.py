@@ -592,6 +592,8 @@ replaced_names = {
     'hologram iter': 'Hologram',
     'audio_encoding iter': 'Encoding',
     'audio_decoding iter': 'Playback',
+    'OpenVINS Camera': 'SLAM',
+    'imu_integrator iter': 'Integrator',
 
     # GPU Values
     'timewarp_gl gpu': 'Reprojection',
