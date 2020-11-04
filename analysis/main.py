@@ -1,4 +1,3 @@
-
 import collections
 import itertools
 from pathlib import Path
@@ -17,19 +16,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import subprocess
-
-T = TypeVar("T")
-V = TypeVar("V")
-def it_concat(its: Iterable[Iterable[T]]) -> Iterable[T]:
-    return itertools.chain.from_iterable(its)
-
-def list_concat(lsts: Iterable[List[T]]) -> List[T]:
-    return list(itertools.chain.from_iterable(lsts))
-
-def dict_concat(dcts: Iterable[Dict[T, V]], **kwargs) -> Dict[T, V]:
-    return dict(it_concat(dct.items() for dct in dcts), **kwargs)
-
+from util import list_concat, it_concat, dict_concat, is_int, is_float
 verify_integrity = True
+from per_trial_analysis import PerTrialData, analysis
 
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
     db_path = metrics_path / (table_name + ".sqlite")
@@ -40,12 +29,6 @@ def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]
         .set_index(index_cols, verify_integrity=verify_integrity)
         .sort_index()
     )
-
-def is_int(string: str) -> bool:
-    return bool(re.match(r"^\d+$", string))
-
-def is_float(string: str) -> bool:
-    return bool(re.match(r"^\d+.\d+(e[+-]\d+)?$", string))
 
 def read_illixr_csv(metrics_path: Path, record_name: str, index_cols: List[str], other_cols: List[str]) -> pd.DataFrame:
     cols = index_cols + other_cols
@@ -760,20 +743,20 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
-populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
-populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
-populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
-populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
+#populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
+#populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
+#populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
+#populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
-populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
-populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
+#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
+#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
-write_graphs(
-    sponza_list + materials_list + platformer_list + demo_list,
-    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
-)
+#write_graphs(
+#    sponza_list + materials_list + platformer_list + demo_list,
+#    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
+#)
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
@@ -897,3 +880,10 @@ write_graphs(
 
     # # import IPython; IPython.embed()
     # # print(summaries["cpu_time_duration_sum"].to_csv())
+     
+for metrics_path in Path("../metrics").iterdir():
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+    output_path = Path("../output") / metrics_path.name
+    output_path.mkdir(exist_ok=True, parents=True)
+    data = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log)
+    analysis(data)   
