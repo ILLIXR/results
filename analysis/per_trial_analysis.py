@@ -227,8 +227,8 @@ def cpu_timeline(data: PerTrialData) -> None:
     plt.ylabel('account_name')  
     colors = ['red','orange','yellow','green','cyan','blue','purple','pink']  
     ax.set_xticks(range(len(data.ts.index.levels[0]))) 
-    ax.set_yticklabels(data.ts.index.levels[0]) 
-    ax.set_yticks(range(len(data.ts.index.levels[0])))  
+    ax.set_yticks(range(len(data.ts.index.levels[0])))
+    ax.set_yticklabels(data.ts.index.levels[0])   
     ax.grid(True)  
     plt.ylim(-1,16) 
     for x in data.ts.index.levels[0]: 
