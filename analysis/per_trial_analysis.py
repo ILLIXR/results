@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from typing import NamedTuple
 from util import list_concat
-from typing import List
+from typing import List, Dict
 from warnings import WarningMessage
 clocks = ["cpu", "wall", "gpu"]
 class PerTrialData(NamedTuple):
@@ -15,6 +15,7 @@ class PerTrialData(NamedTuple):
     switchboard_topic_stop: pd.DataFrame
     mtp: pd.DataFrame
     warnings_log: List[WarningMessage]
+    conditions: Dict[str, str]
     
 def analysis(data: PerTrialData) -> None:
     table_summaries(data)

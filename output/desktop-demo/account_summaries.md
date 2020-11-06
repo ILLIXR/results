@@ -79,7 +79,7 @@
 
 # Warnings
 
-- main.py:57 Many (2 / 25) lines of thread were spliced incorrectly.
+- main.py:58 Many (2 / 25) lines of thread were spliced incorrectly.
 
 
 

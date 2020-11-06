@@ -1,3 +1,4 @@
+import yaml
 import collections
 import itertools
 from pathlib import Path
@@ -882,8 +883,10 @@ def write_graphs(
     # # print(summaries["cpu_time_duration_sum"].to_csv())
      
 for metrics_path in Path("../metrics").iterdir():
+    with (metrics_path / "trial_conditions.yaml").open() as f: 
+        conditions = yaml.safe_load(f)
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
     output_path = Path("../output") / metrics_path.name
     output_path.mkdir(exist_ok=True, parents=True)
-    data = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log)
-    analysis(data)   
+    data = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions)
+    analysis(data)  
