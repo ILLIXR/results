@@ -3,19 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 from typing import NamedTuple
-from util import list_concat
+from util import list_concat, TrialConditions, PerTrialData
 from typing import List, Dict
 from warnings import WarningMessage
 clocks = ["cpu", "wall", "gpu"]
-class PerTrialData(NamedTuple):
-    ts: pd.DataFrame
-    summaries: pd.DataFrame
-    thread_ids: pd.DataFrame
-    output_path: Path
-    switchboard_topic_stop: pd.DataFrame
-    mtp: pd.DataFrame
-    warnings_log: List[WarningMessage]
-    conditions: Dict[str, str]
     
 def analysis(data: PerTrialData) -> None:
     table_summaries(data)

@@ -17,9 +17,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import subprocess
-from util import list_concat, it_concat, dict_concat, is_int, is_float
+from util import list_concat, it_concat, dict_concat, is_int, is_float, TrialConditions, PerTrialData
 verify_integrity = True
-from per_trial_analysis import PerTrialData, analysis
+from per_trial_analysis import analysis as per_trial_analysis
+from inter_trial_analysis import analysis as inter_trial_analysis
 
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
     db_path = metrics_path / (table_name + ".sqlite")
@@ -582,137 +583,15 @@ replaced_names = {
     'hologram': 'Hologram',
 }
 
-def populate_fps(data_frame, name_list, csv_name):
-    metrics_path = Path("..") / f"{name_list[0]}"
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-    account_names = ts.index.levels[0]
-    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    account_list = [name for name in account_names if name not in ignore_list]
-    account_list.append('app') 
-    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
-    data_frame["Components"] = account_list
-
-    for run_name in tqdm(name_list):
-        metrics_path = Path("..") / f"{run_name}"
-        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-        account_names = ts.index.levels[0]
-
-        values = []
-        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-        for idx, name in enumerate(account_names):
-            if name in ignore_list:
-                continue
-
-            values.append(summaries["period_mean"][name])
-        values.append(summaries["period_mean"]['app'])
-
-        data_frame[run_name] = values
-        data_frame.to_csv(csv_name, index=False)
-    
-
-def populate_cpu(data_frame, name_list, csv_name):
-    metrics_path = Path("..") / f"{name_list[0]}"
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-    account_names = ts.index.levels[0]
-    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    account_list = [name for name in account_names if name not in ignore_list]
-    account_list.append('app') 
-    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
-    account_list.insert(0, "Run Name")
-    data_frame = pd.DataFrame([], columns=account_list)
-
-    for run_name in tqdm(name_list):
-        metrics_path = Path("..") / f"{run_name}"
-        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-        account_names = ts.index.levels[0]
-
-        values = {"Run Name": run_name}
-        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-        for idx, name in enumerate(account_names):
-            if name in ignore_list:
-                continue
-
-            formatted_name = replaced_names[name] if name in replaced_names else name
-            values.update({formatted_name: summaries["cpu_time_duration_sum"][name]})
-        values.update({"Application": summaries["cpu_time_duration_sum"]['app']})
-
-        data_frame = data_frame.append(values, ignore_index=True, sort=False)
-        # from IPython import embed; embed()
-
-    data_frame.to_csv(csv_name, index=False)
-
 # Components on the X
 # Each run on the Y
 #populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-
-def populate_gpu(data_frame, name_list, csv_name):
-    metrics_path = Path("..") / f"{name_list[0]}"
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-    account_names = ts.index.levels[0]
-    account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
-    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
-    account_list.insert(0, "Run Name")
-    data_frame = pd.DataFrame([], columns=account_list)
-
-    for run_name in tqdm(name_list):
-        metrics_path = Path("..") / f"{run_name}"
-        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-        account_names = ts.index.levels[0]
-
-        values = {"Run Name": run_name}
-        name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
-        for idx, name in enumerate(name_list):
-
-            formatted_name = replaced_names[name] if name in replaced_names else name
-            values.update({formatted_name: summaries["gpu_time_duration_sum"][name]})
-
-        data_frame = data_frame.append(values, ignore_index=True, sort=False)
-        # from IPython import embed; embed()
-
-    data_frame.to_csv(csv_name, index=False)
 
 # Components on the X
 # Each run on the Y
 #populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
 
-def populate_power(data_frame, name_list, csv_name):
-    metrics_path = Path("..") / f"{name_list[0]}"
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-    account_names = ts.index.levels[0]
-    account_list = ['CPU Power', 'GPU Power', 'DDR Power', 'SOC Power', 'SYS Power']
-    account_list.insert(0, "Run Name")
-    data_frame = pd.DataFrame([], columns=account_list)
-
-    for run_name in tqdm(name_list):
-        metrics_path = Path("..") / f"{run_name}"
-        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
-        account_names = ts.index.levels[0]
-
-        if len(power_data) == 4:
-            gpu_power = power_data[0]
-            cpu_time = power_data[1]
-            cpu_energy = power_data[2]
-            ddr_energy = power_data[3]
-
-            cpu_power = cpu_energy / cpu_time
-            ddr_power = ddr_energy / cpu_time
-            values = {"Run Name": run_name, 'GPU Power': gpu_power, 'CPU Power': cpu_power, 'DDR Power': ddr_power}
-            data_frame = data_frame.append(values, ignore_index=True, sort=False)
-        else:
-            values = {"Run Name": run_name, 'GPU Power': power_data[1], 'DDR Power': power_data[2], 'CPU Power': power_data[3], 'SOC Power': power_data[4], 'SYS Power': power_data[5]}
-            data_frame = data_frame.append(values, ignore_index=True, sort=False)
-
-        # from IPython import embed; embed()
-
-    data_frame.to_csv(csv_name, index=False)
-
 #populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-
-def populate_mtp(name_list: List[str]) -> None:
-    for run_name in tqdm(name_list):
-        metrics_path = Path("..") / f"{run_name}"
-        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
-        mtp.to_csv(metrics_path / f"{run_name}-mtp.csv", index=False)
 
 #populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
@@ -743,7 +622,6 @@ def write_graphs(
         ax.legend()
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
-
 #populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
 #populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
 #populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
@@ -881,12 +759,18 @@ def write_graphs(
 
     # # import IPython; IPython.embed()
     # # print(summaries["cpu_time_duration_sum"].to_csv())
-     
+
+trials: List[PerTrialData] = []
 for metrics_path in Path("../metrics").iterdir():
     with (metrics_path / "trial_conditions.yaml").open() as f: 
-        conditions = yaml.safe_load(f)
+        conditions: Dict[str, str] = yaml.safe_load(f)
+        conditions_obj = TrialConditions(**conditions)
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
     output_path = Path("../output") / metrics_path.name
     output_path.mkdir(exist_ok=True, parents=True)
-    data = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions)
-    analysis(data)  
+    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+    trials.append(trial)
+    per_trial_analysis(trial)
+inter_trial_analysis(trials, replaced_names)
+
+ 
