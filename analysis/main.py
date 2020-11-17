@@ -451,6 +451,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
                 stop  = max(stop , ts.loc["runtime check_qs", "cpu_time_stop" ].max())
                 thread_ids.loc[thread_ids["sub_name"] == "0", "total_cpu_time_usage"] = stop - start
                 thread_ids.loc[thread_ids["sub_name"] == "0", "missing_cpu_time_usage"] = stop - start - used
+            else:
+                warnings.warn("'runtime check_qs' account not found. Skipping.")
 
             for account_name in account_names:
                 if account_name.endswith(" iter"):
