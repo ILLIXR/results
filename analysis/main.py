@@ -767,6 +767,9 @@ def write_graphs(
 
 trials: List[PerTrialData] = []
 for metrics_path in Path("../metrics").iterdir():
+    if not (metrics_path / "trial_conditions.yaml").exists():
+        warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
+        continue
     with (metrics_path / "trial_conditions.yaml").open() as f: 
         conditions: Dict[str, str] = yaml.safe_load(f)
         conditions_obj = TrialConditions(**conditions)

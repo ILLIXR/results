@@ -15,4 +15,4 @@
 # Running the Script
 - On the first time, run `poetry install`.
 - Run `poetry run python3 main.py`. This will run all of the analyses on all of the data.
-- The output corresponding to `metrics/NAME` will appear in `output/NAME`, where `NAME`.
+- The output corresponding to `metrics/NAME` will appear in `output/NAME`, where `NAME` is an arbitrary subdirectory.
