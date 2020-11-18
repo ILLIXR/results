@@ -54,7 +54,7 @@ class PerTrialData(NamedTuple):
     switchboard_topic_stop: pd.DataFrame
 
     # [m]otion-[t]o-[p]hoton
-    # Each row (conceptually a "vsync-graphics-cycle") has "imu_to_display", "predict_to_display", "render_to_display", and "wall_time"
+    # Each row (conceptually a "vsync-graphics-cycle") has "imu_to_display", "predict_to_display", "render_to_display", and "wall_time" (of vsync)
     mtp: pd.DataFrame
 
     # Power data parsed out of external tools.
