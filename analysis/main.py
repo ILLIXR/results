@@ -445,11 +445,14 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
                     used += ts.loc[account_name, "cpu_time_duration"].sum()
                     start = min(start, ts.loc[account_name, "cpu_time_start"].min())
                     stop  = max(stop , ts.loc[account_name, "cpu_time_start"].max())
-            used += ts.loc["runtime check_qs", "cpu_time_duration"].sum()
-            start = min(start, ts.loc["runtime check_qs", "cpu_time_start"].min())
-            stop  = max(stop , ts.loc["runtime check_qs", "cpu_time_stop" ].max())
-            thread_ids.loc[thread_ids["sub_name"] == "0", "total_cpu_time_usage"] = stop - start
-            thread_ids.loc[thread_ids["sub_name"] == "0", "missing_cpu_time_usage"] = stop - start - used
+            if "runtime check_qs" in ts:
+                used += ts.loc["runtime check_qs", "cpu_time_duration"].sum()
+                start = min(start, ts.loc["runtime check_qs", "cpu_time_start"].min())
+                stop  = max(stop , ts.loc["runtime check_qs", "cpu_time_stop" ].max())
+                thread_ids.loc[thread_ids["sub_name"] == "0", "total_cpu_time_usage"] = stop - start
+                thread_ids.loc[thread_ids["sub_name"] == "0", "missing_cpu_time_usage"] = stop - start - used
+            else:
+                warnings.warn("'runtime check_qs' account not found. Skipping.")
 
             for account_name in account_names:
                 if account_name.endswith(" iter"):
