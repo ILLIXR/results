@@ -6,6 +6,7 @@ from typing import NamedTuple
 from util import list_concat, TrialConditions, PerTrialData
 from typing import List, Dict
 from warnings import WarningMessage
+import charmonium.time_block as ch_time_block
 clocks = ["cpu", "wall", "gpu"]
     
 def analysis(data: PerTrialData) -> None:
@@ -17,7 +18,8 @@ def analysis(data: PerTrialData) -> None:
     account_time_series(data)
     #motion_to_photon(data)
     cpu_timeline(data)
-    
+
+@ch_time_block.decor(print_start=False, print_args=False)   
 def table_summaries(data: PerTrialData) -> None:
     with (data.output_path / "account_summaries.md").open("w") as f:
         f.write("# Summaries\n\n")
@@ -51,7 +53,8 @@ def table_summaries(data: PerTrialData) -> None:
             df = data.ts.loc[account_name]
             f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
             f.write("\n\n")
-      
+
+@ch_time_block.decor(print_start=False, print_args=False)      
 def stacked_cpu_time(data: PerTrialData) -> None:
     replaced_names = {
         'app': 'Application',
@@ -102,7 +105,7 @@ def stacked_cpu_time(data: PerTrialData) -> None:
     plt.savefig(data.output_path / "stacked.png")
     plt.close()
   
-  
+@ch_time_block.decor(print_start=False, print_args=False)  
 def stacked_gpu_time(data: PerTrialData) -> None:
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     total_gpu_time = 0.0
@@ -129,7 +132,8 @@ def stacked_gpu_time(data: PerTrialData) -> None:
     plt.xlabel("Full System")
     plt.savefig(data.output_path / "stacked_gpu.png")
     plt.close()
-    
+
+@ch_time_block.decor(print_start=False, print_args=False)    
 def stacked_energy(data: PerTrialData) -> None:
     #plt.clf()
     #gpu_energy = gpu_power * cpu_time
@@ -148,6 +152,7 @@ def stacked_energy(data: PerTrialData) -> None:
     #plt.savefig(data.output_path / "stacked_energy.png")
     pass
     
+@ch_time_block.decor(print_start=False, print_args=False)
 def time_series(data: PerTrialData) -> None:
     f = plt.figure()
     f.tight_layout(pad=2.0)
@@ -174,6 +179,7 @@ def time_series(data: PerTrialData) -> None:
     plt.savefig(data.output_path / "overlayed.png")
     plt.close()
     
+@ch_time_block.decor(print_start=False, print_args=False)
 def account_time_series(data: PerTrialData) -> None:
     ts_dir = data.output_path / "ts"
     ts_dir.mkdir(exist_ok=True)
@@ -197,6 +203,7 @@ def account_time_series(data: PerTrialData) -> None:
         plt.savefig(ts_dir / f"{account_name}.png")
         plt.close()
 
+@ch_time_block.decor(print_start=False, print_args=False)
 def motion_to_photon(data: PerTrialData) -> None:
     fig = plt.figure()
     ax = plt.gca()
@@ -208,6 +215,7 @@ def motion_to_photon(data: PerTrialData) -> None:
     fig.savefig(data.output_path / "mtp.png")
     plt.close(fig)
 
+@ch_time_block.decor(print_start=False, print_args=False)
 def cpu_timeline(data: PerTrialData) -> None:
     rowNum = -1.5 
     coIndex = 0  

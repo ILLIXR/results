@@ -2,6 +2,7 @@ from util import PerTrialData
 import pandas as pd
 from typing import List, Dict
 from tqdm import tqdm
+import charmonium.time_block as ch_time_block
 
 def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     populate_fps(trials, replaced_names)
@@ -10,6 +11,7 @@ def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     populate_power(trials, replaced_names)
     populate_mtp(trials, replaced_names)
 
+@ch_time_block.decor(print_start=False, print_args=False)   
 def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     account_names = trials[0].ts.index.levels[0]
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
@@ -34,6 +36,7 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
         data_frame[trial.conditions.application + '-'+ trial.conditions.machine] = values
         data_frame.to_csv('../output/fps.csv', index=False)
 
+@ch_time_block.decor(print_start=False, print_args=False)   
 def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     account_names = trials[0].ts.index.levels[0]
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
@@ -60,6 +63,7 @@ def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
 
     data_frame.to_csv('../output/cpu.csv', index=False)
 
+@ch_time_block.decor(print_start=False, print_args=False)   
 def populate_gpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     account_names = trials[0].ts.index.levels[0]
     account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
@@ -82,6 +86,7 @@ def populate_gpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
 
     data_frame.to_csv('../output/gpu.csv', index=False)
 
+@ch_time_block.decor(print_start=False, print_args=False)
 def populate_power(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     account_names = trials[0].ts.index.levels[0]
     account_list = ['CPU Power', 'GPU Power', 'DDR Power', 'SOC Power', 'SYS Power']
@@ -108,7 +113,8 @@ def populate_power(trials: List[PerTrialData], replaced_names: Dict[str,str]) ->
         # from IPython import embed; embed()
 
     data_frame.to_csv('../output/power.csv', index=False)
-    
+
+@ch_time_block.decor(print_start=False, print_args=False)    
 def populate_mtp(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     for trial in tqdm(trials):
         trial.mtp.to_csv(trial.output_path / "mtp.csv", index=False)
