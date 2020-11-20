@@ -1,11 +1,18 @@
-﻿- Per-trial and inter-trial analysis can be found in the `analysis/per-trial-analysis.py` and `analysis/inter-trial-analysis.py` files, respectively. The `analysis` functions in each file run all inter-trial or per-trial analysis within. 
-- All data goes in `metrics/` 
-- You must add `trial_conditions.yaml` for any data to be collected 
-- [Fields of `PerTrialData` meaning]
-- To run:
-	- Run`poetry shell`, then inside that `python3 main.py`
-	- `main.py` will run all of the analysis 
-- You can type check using `mypy --strict --ignore-missing-imports main.py` to ensure proper types are being used. Requirements for mypy to be able to check funcions: 
-	- Inputs: Use `:` after a variable name to signify type
-	- Outputs: Use `->` to provide what is returned by function 
+﻿# Adding an Analysis
+- Per-trial and inter-trial analyses can be found in the `analysis/per-trial-analysis.py` and `analysis/inter-trial-analysis.py` files, respectively.
+- Per-trial analyses takes a single `PerTrialData`, while inter-trial analyses take a `List[PerTrialData]`. See `analysis/util.py:PerTrialAnalysis` for what each attribute means.
+- The `analysis` functions in each file run all inter-trial or per-trial analysis within. 
+- Running the analyses is a slow way of revealing errors; To speed up development, you can quickly type check your analyses using Mypy,
+  - `poetry run mypy --strict --ignore-missing-imports main.py`, and on the first time `poetry install --dev`.
+  - Parameter-type: Use `:` after a variable name to signify type (e.g. `def foo(x: int)`).
+  - Return-type: Use `->` to provide what is returned by function (e.g. `def foo() -> int`).
+  - Container type: If you create an empty container, use `:` to denote the type. (e.g. `x: List[int] = []`).
 
+# Adding Data
+- Place data in `metrics/NAME`, where `NAME` is an arbitrary unused directory.
+- You must add `metrics/NAME/trial_conditions.yaml` for any data to be collected. See `analysis/util.py:TrialConditions` for the schema of this YAML.
+
+# Running the Script
+- On the first time, run `poetry install`.
+- Run `poetry run python3 main.py`. This will run all of the analyses on all of the data.
+- The output corresponding to `metrics/NAME` will appear in `output/NAME`, where `NAME` is an arbitrary subdirectory.
