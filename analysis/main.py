@@ -645,40 +645,10 @@ def write_graphs(
     #     gpu_power = power_data[0]
     #     cpu_time = power_data[1]
     #     cpu_energy = power_data[2]
-    #     # # Stacked Energy Graphs Desktop
-    #     plt.clf()
-    #     gpu_energy = gpu_power * cpu_time
-    #     total_energy = cpu_energy + gpu_energy
-    #     print(gpu_energy)
-    #     print(cpu_energy)
-    #     width = 0.4
-    #     bar_plots = []
-    #     bar_plots.append(plt.bar(1, cpu_energy, width=width, bottom=0)[0])
-    #     bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy)[0])
-    #     plt.title('Energy Breakdown Per Run')
-    #     plt.xticks(np.arange(0, 1, step=1))
-    #     plt.yticks(np.arange(0, total_energy+1, total_energy/10))
-    #     plt.ylabel('Percent of Total Energy')
-    #     plt.subplots_adjust(right=0.7)
-    #     plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    #     plt.xlabel("Full System")
-    #     plt.savefig(output_path / "stacked_energy.png")
     #     # # Stacked Power Graphs Desktop
     #     plt.clf()
     #     cpu_power = cpu_energy / cpu_time
     #     total_power = cpu_power + gpu_power
-    #     width = 0.4
-    #     bar_plots = []
-    #     bar_plots.append(plt.bar(1, cpu_power, width=width, bottom=0)[0])
-    #     bar_plots.append(plt.bar(1, gpu_power, width=width, bottom= cpu_power)[0])
-    #     plt.title('Power Breakdown Per Run')
-    #     plt.xticks(np.arange(0, 1, step=1))
-    #     plt.yticks(np.arange(0, total_power+1, total_power/10))
-    #     plt.ylabel('Percent of Total Power')
-    #     plt.subplots_adjust(right=0.7)
-    #     plt.legend([x for x in bar_plots], ['CPU Power', 'GPU Power'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    #     plt.xlabel("Full System")
-    #     plt.savefig(output_path / "stacked_power.png")
     # else:
     #     # # Stacked Power Graphs Jetson
     #     plt.clf()
@@ -703,62 +673,6 @@ def write_graphs(
     #     print(power_data[3])
     #     print(power_data[4])
     #     print(power_data[5])
-
-    # import IPython; IPython.embed()
-
-    # Overlayed graphs
-    # f = plt.figure()
-    # f.tight_layout(pad=2.0)
-    # plt.rcParams.update({'font.size': 8})
-    # # plot the same data on both axes
-    # ax = f.gca()
-    # ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime', 'camera_cvtfmt', 'zed_imu_thread iter', 'OpenVINS IMU', 'camera_cvtfmt']
-    # for i, account_name in enumerate(account_names):
-    #     if account_name in ignore_list:
-    #         continue
-    #     x_data = ts.loc[account_name, "wall_time_start"].copy()
-    #     y_data = ts.loc[account_name, "cpu_time_duration"].copy()
-    #     if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
-    #         x_data.drop(x_data.index[0], inplace=True)
-    #         y_data.drop(y_data.index[0], inplace=True)
-    #     if account_name in replaced_names:
-    #         ax.plot(x_data, y_data, label=replaced_names[account_name])
-    #     else:
-    #         ax.plot(x_data, y_data, label=account_name)
-
-    #     ax.set_title(f"{account_name} CPU Time Timeseries")
-    #     ax.set(ylabel='CPU Time (ms)')
-    # plt.xlabel("Timestamp (ms)")
-    # plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    # plt.subplots_adjust(right=0.6)
-    # plt.yscale("log")
-    # plt.savefig(output_path / "overlayed.png")
-    # plt.close()
-    # import IPython; IPython.embed()
-
-    # # Individual graphs
-    # ts_dir = output_path / "ts"
-    # ts_dir.mkdir(exist_ok=True)
-    # for i, account_name in enumerate(account_names):
-    #     if account_name in ignore_list:
-    #         continue
-    #     f = plt.figure()
-    #     f.tight_layout(pad=2.0)
-    #     plt.rcParams.update({'font.size': 8})
-    #     # plot the same data on both axes
-    #     x_data = ts.loc[account_name, "wall_time_start"].copy()
-    #     y_data = ts.loc[account_name, "cpu_time_duration"].copy()
-    #     if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
-    #         x_data.drop(x_data.index[0], inplace=True)
-    #         y_data.drop(y_data.index[0], inplace=True)
-    #     ax = f.gca()
-    #     ax.plot(x_data, y_data)
-    #     ax.set_title(f"{account_name} CPU Time Timeseries")
-    #     ax.set(ylabel='CPU Time (ms)')
-    #     plt.xlabel("Timestamp (ms)")
-    #     plt.yscale("log")
-    #     plt.savefig(ts_dir / f"{account_name}.png")
-    #     plt.close()
 
     # # import IPython; IPython.embed()
     # # print(summaries["cpu_time_duration_sum"].to_csv())
