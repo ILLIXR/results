@@ -536,44 +536,6 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
-# TODO: use ../metrics/blah/ instead of ../metrics-blah/
-run_list = [
-    path.name.partition("-")[2]
-    for path in list(Path("..").iterdir())
-    if path.name.endswith("metrics-")
-]
-
-sponza_list = [
-    "metrics-jetsonlp-sponza",
-    "metrics-jetsonhp-sponza",
-    "metrics-desktop-sponza",
-]
-materials_list = [
-    "metrics-jetsonlp-materials",
-    "metrics-jetsonhp-materials",
-    "metrics-desktop-materials",
-]
-platformer_list = [
-    "metrics-jetsonlp-platformer",
-    "metrics-jetsonhp-platformer",
-    "metrics-desktop-platformer",
-]
-demo_list = [
-    "metrics-desktop-demo",
-    "metrics-jetsonhp-demo",
-    "metrics-jetsonlp-demo",
-]
-
-fps_spreadsheet_sponza = pd.DataFrame()
-fps_spreadsheet_materials = pd.DataFrame() 
-fps_spreadsheet_platformer = pd.DataFrame() 
-fps_spreadsheet_demo = pd.DataFrame() 
-
-power_spreadsheet = pd.DataFrame() 
-cpu_spreadsheet = pd.DataFrame() 
-gpu_spreadsheet = pd.DataFrame() 
-timeseries_spreadsheet = pd.DataFrame() 
-
 replaced_names = {
     'app': 'Application',
     'zed_imu_thread iter': 'IMU',
@@ -587,18 +549,6 @@ replaced_names = {
     'timewarp_gl gpu': 'Reprojection',
     'hologram': 'Hologram',
 }
-
-# Components on the X
-# Each run on the Y
-#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-
-# Components on the X
-# Each run on the Y
-#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
-
-#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-
-#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
 
 def write_graphs(
@@ -627,20 +577,11 @@ def write_graphs(
         ax.legend()
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
+
 #populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
 #populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
 #populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
 #populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
-
-#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
-#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
-
-#write_graphs(
-#    sponza_list + materials_list + platformer_list + demo_list,
-#    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
-#)
 
     # # Stacked Energy Graphs
     # if len(power_data) == 3:
