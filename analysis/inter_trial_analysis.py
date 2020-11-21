@@ -4,18 +4,19 @@ from typing import List, Dict
 from tqdm import tqdm
 
 def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    populate_fps(trials, replaced_names)
+    # populate_fps(trials, replaced_names)
     populate_cpu(trials, replaced_names)
     populate_gpu(trials, replaced_names)
     populate_power(trials, replaced_names)
-    populate_mtp(trials, replaced_names)
+    # populate_mtp(trials, replaced_names)
 
 def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    account_names = trials[0].ts.index.levels[0]
-    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    account_list = [name for name in account_names if name not in ignore_list]
-    account_list.append('app') 
-    account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
+    # account_names = trials[0].ts.index.levels[0]
+    # ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
+    # account_list = [name for name in account_names if name not in ignore_list]
+    # account_list.append('app') 
+    # account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Hologram', 'Playback', 'Encoding']
     data_frame = pd.DataFrame()
     data_frame["Components"] = account_list
 
@@ -23,15 +24,16 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
         account_names = trial.ts.index.levels[0]
 
         values = []
-        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
         for idx, name in enumerate(account_names):
             if name in ignore_list:
                 continue
-
+            
             values.append(trial.summaries["period_mean"][name])
-        values.append(trial.summaries["period_mean"]['app'])
+        # values.append(trial.summaries["period_mean"]['app'])
 
-        data_frame[trial.conditions.application + '-'+ trial.conditions.machine] = values
+        print(values)
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
         data_frame.to_csv('../output/fps.csv', index=False)
 
 def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:

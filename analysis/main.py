@@ -582,23 +582,12 @@ replaced_names = {
     'hologram iter': 'Hologram',
     'audio_encoding iter': 'Encoding',
     'audio_decoding iter': 'Playback',
+    'imu_integrator iter': 'IMU Integrator',
 
     # GPU Values
     'timewarp_gl gpu': 'Reprojection',
     'hologram': 'Hologram',
 }
-
-# Components on the X
-# Each run on the Y
-#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-
-# Components on the X
-# Each run on the Y
-#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
-
-#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-
-#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
 
 def write_graphs(
@@ -627,158 +616,22 @@ def write_graphs(
         ax.legend()
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
-#populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
-#populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
-#populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
-#populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
-#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
-#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
-#write_graphs(
-#    sponza_list + materials_list + platformer_list + demo_list,
-#    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
-#)
+# trials: List[PerTrialData] = []
+# for metrics_path in Path("../metrics").iterdir():
+#     if not (metrics_path / "trial_conditions.yaml").exists():
+#         warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
+#         continue
+#     with (metrics_path / "trial_conditions.yaml").open() as f: 
+#         conditions: Dict[str, str] = yaml.safe_load(f)
+#         conditions_obj = TrialConditions(**conditions)
 
-    # # Stacked Energy Graphs
-    # if len(power_data) == 3:
-    #     gpu_power = power_data[0]
-    #     cpu_time = power_data[1]
-    #     cpu_energy = power_data[2]
-    #     # # Stacked Energy Graphs Desktop
-    #     plt.clf()
-    #     gpu_energy = gpu_power * cpu_time
-    #     total_energy = cpu_energy + gpu_energy
-    #     print(gpu_energy)
-    #     print(cpu_energy)
-    #     width = 0.4
-    #     bar_plots = []
-    #     bar_plots.append(plt.bar(1, cpu_energy, width=width, bottom=0)[0])
-    #     bar_plots.append(plt.bar(1, gpu_energy, width=width, bottom= cpu_energy)[0])
-    #     plt.title('Energy Breakdown Per Run')
-    #     plt.xticks(np.arange(0, 1, step=1))
-    #     plt.yticks(np.arange(0, total_energy+1, total_energy/10))
-    #     plt.ylabel('Percent of Total Energy')
-    #     plt.subplots_adjust(right=0.7)
-    #     plt.legend([x for x in bar_plots], ['CPU Energy', 'GPU Energy'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    #     plt.xlabel("Full System")
-    #     plt.savefig(output_path / "stacked_energy.png")
-    #     # # Stacked Power Graphs Desktop
-    #     plt.clf()
-    #     cpu_power = cpu_energy / cpu_time
-    #     total_power = cpu_power + gpu_power
-    #     width = 0.4
-    #     bar_plots = []
-    #     bar_plots.append(plt.bar(1, cpu_power, width=width, bottom=0)[0])
-    #     bar_plots.append(plt.bar(1, gpu_power, width=width, bottom= cpu_power)[0])
-    #     plt.title('Power Breakdown Per Run')
-    #     plt.xticks(np.arange(0, 1, step=1))
-    #     plt.yticks(np.arange(0, total_power+1, total_power/10))
-    #     plt.ylabel('Percent of Total Power')
-    #     plt.subplots_adjust(right=0.7)
-    #     plt.legend([x for x in bar_plots], ['CPU Power', 'GPU Power'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    #     plt.xlabel("Full System")
-    #     plt.savefig(output_path / "stacked_power.png")
-    # else:
-    #     # # Stacked Power Graphs Jetson
-    #     plt.clf()
-    #     total_power = power_data[0]
-    #     width = 0.4
-    #     bar_plots = []
-    #     bar_plots.append(plt.bar(1, power_data[1], width=width, bottom=0)[0])
-    #     bar_plots.append(plt.bar(1, power_data[2], width=width, bottom= power_data[1])[0])
-    #     bar_plots.append(plt.bar(1, power_data[3], width=width, bottom= power_data[1] + power_data[2])[0])
-    #     bar_plots.append(plt.bar(1, power_data[4], width=width, bottom= power_data[1] + power_data[2] + power_data[3])[0])
-    #     bar_plots.append(plt.bar(1, power_data[5], width=width, bottom= power_data[1] + power_data[2] + power_data[3] + power_data[4])[0])
-    #     plt.title('Power Breakdown Per Run')
-    #     plt.xticks(np.arange(0, 1, step=1))
-    #     plt.yticks(np.arange(0, total_power+1, total_power/10))
-    #     plt.ylabel('Percent of Total Power')
-    #     plt.subplots_adjust(right=0.7)
-    #     plt.legend([x for x in bar_plots], ['GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    #     plt.xlabel("Full System")
-    #     plt.savefig(output_path / "stacked_power.png")
-    #     print(power_data[1])
-    #     print(power_data[2])
-    #     print(power_data[3])
-    #     print(power_data[4])
-    #     print(power_data[5])
+#     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+#     output_path = Path("../output") / metrics_path.name
+#     output_path.mkdir(exist_ok=True, parents=True)
+#     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+#     trials.append(trial)
+#     # per_trial_analysis(trial)
+# inter_trial_analysis(trials, replaced_names)
 
-    # import IPython; IPython.embed()
-
-    # Overlayed graphs
-    # f = plt.figure()
-    # f.tight_layout(pad=2.0)
-    # plt.rcParams.update({'font.size': 8})
-    # # plot the same data on both axes
-    # ax = f.gca()
-    # ignore_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu', 'hologram', 'opencv', 'Runtime', 'camera_cvtfmt', 'zed_imu_thread iter', 'OpenVINS IMU', 'camera_cvtfmt']
-    # for i, account_name in enumerate(account_names):
-    #     if account_name in ignore_list:
-    #         continue
-    #     x_data = ts.loc[account_name, "wall_time_start"].copy()
-    #     y_data = ts.loc[account_name, "cpu_time_duration"].copy()
-    #     if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
-    #         x_data.drop(x_data.index[0], inplace=True)
-    #         y_data.drop(y_data.index[0], inplace=True)
-    #     if account_name in replaced_names:
-    #         ax.plot(x_data, y_data, label=replaced_names[account_name])
-    #     else:
-    #         ax.plot(x_data, y_data, label=account_name)
-
-    #     ax.set_title(f"{account_name} CPU Time Timeseries")
-    #     ax.set(ylabel='CPU Time (ms)')
-    # plt.xlabel("Timestamp (ms)")
-    # plt.legend(bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
-    # plt.subplots_adjust(right=0.6)
-    # plt.yscale("log")
-    # plt.savefig(output_path / "overlayed.png")
-    # plt.close()
-    # import IPython; IPython.embed()
-
-    # # Individual graphs
-    # ts_dir = output_path / "ts"
-    # ts_dir.mkdir(exist_ok=True)
-    # for i, account_name in enumerate(account_names):
-    #     if account_name in ignore_list:
-    #         continue
-    #     f = plt.figure()
-    #     f.tight_layout(pad=2.0)
-    #     plt.rcParams.update({'font.size': 8})
-    #     # plot the same data on both axes
-    #     x_data = ts.loc[account_name, "wall_time_start"].copy()
-    #     y_data = ts.loc[account_name, "cpu_time_duration"].copy()
-    #     if account_name == 'hologram iter' or account_name == 'timewarp_gl iter':
-    #         x_data.drop(x_data.index[0], inplace=True)
-    #         y_data.drop(y_data.index[0], inplace=True)
-    #     ax = f.gca()
-    #     ax.plot(x_data, y_data)
-    #     ax.set_title(f"{account_name} CPU Time Timeseries")
-    #     ax.set(ylabel='CPU Time (ms)')
-    #     plt.xlabel("Timestamp (ms)")
-    #     plt.yscale("log")
-    #     plt.savefig(ts_dir / f"{account_name}.png")
-    #     plt.close()
-
-    # # import IPython; IPython.embed()
-    # # print(summaries["cpu_time_duration_sum"].to_csv())
-
-trials: List[PerTrialData] = []
-for metrics_path in Path("../metrics").iterdir():
-    if not (metrics_path / "trial_conditions.yaml").exists():
-        warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
-        continue
-    with (metrics_path / "trial_conditions.yaml").open() as f: 
-        conditions: Dict[str, str] = yaml.safe_load(f)
-        conditions_obj = TrialConditions(**conditions)
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
-    output_path = Path("../output") / metrics_path.name
-    output_path.mkdir(exist_ok=True, parents=True)
-    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
-    trials.append(trial)
-    per_trial_analysis(trial)
-inter_trial_analysis(trials, replaced_names)
-
- 
