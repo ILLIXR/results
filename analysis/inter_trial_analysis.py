@@ -5,11 +5,12 @@ from tqdm import tqdm
 import charmonium.time_block as ch_time_block
 
 def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    populate_fps(trials, replaced_names)
-    populate_cpu(trials, replaced_names)
-    populate_gpu(trials, replaced_names)
-    populate_power(trials, replaced_names)
-    populate_mtp(trials, replaced_names)
+    print("\U0001f600")
+    # populate_fps(trials, replaced_names)
+    # populate_cpu(trials, replaced_names)
+    # populate_gpu(trials, replaced_names)
+    # populate_power(trials, replaced_names)
+    # populate_mtp(trials, replaced_names)
 
 @ch_time_block.decor(print_start=False, print_args=False)   
 def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
@@ -18,12 +19,12 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
     # account_list = [name for name in account_names if name not in ignore_list]
     # account_list.append('app') 
     # account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
-    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Hologram', 'Playback', 'Encoding']
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
     data_frame = pd.DataFrame()
     data_frame["Components"] = account_list
 
     for trial in tqdm(trials):
-        account_names = trial.ts.index.levels[0]
+        account_names = ['OpenVINS Camera', 'zed_camera_thread iter', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
 
         values = []
         ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
@@ -34,7 +35,27 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
             values.append(trial.summaries["period_mean"][name])
         # values.append(trial.summaries["period_mean"]['app'])
 
-        print(values)
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
+        data_frame.to_csv('../output/fps.csv', index=False)
+
+@ch_time_block.decor(print_start=False, print_args=False)   
+def populate_frame_time(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
+    data_frame = pd.DataFrame()
+    data_frame["Components"] = account_list
+
+    for trial in tqdm(trials):
+        account_names = ['OpenVINS Camera', 'zed_camera_thread iter', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+
+        values = []
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
+        for idx, name in enumerate(account_names):
+            if name in ignore_list:
+                continue
+            
+            values.append(trial.summaries["period_mean"][name])
+        # values.append(trial.summaries["period_mean"]['app'])
+
         data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
         data_frame.to_csv('../output/fps.csv', index=False)
 
@@ -42,8 +63,8 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
 def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     account_names = trials[0].ts.index.levels[0]
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    account_list = [name for name in account_names if name not in ignore_list]
-    account_list.append('app') 
+    account_list = ['OpenVINS Camera', 'OpenVINS IMU', 'audio_decoding iter', 'audio_encoding iter', 'imu_integrator iter', 'timewarp_gl iter', 'zed_camera_thread iter', 'zed_imu_thread iter', 'app']
+
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
     account_list.insert(0, "Run Name")
     data_frame = pd.DataFrame([], columns=account_list)
@@ -77,7 +98,7 @@ def populate_gpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
         account_names = trial.ts.index.levels[0]
 
         values = {"Run Name": trial.conditions.application + '-'+ trial.conditions.machine}
-        name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+        name_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu']
         for idx, name in enumerate(name_list):
 
             formatted_name = replaced_names[name] if name in replaced_names else name
