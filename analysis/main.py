@@ -554,24 +554,24 @@ run_list = [
 ]
 
 sponza_list = [
-    "metrics-jetsonlp-sponza",
-    "metrics-jetsonhp-sponza",
     "metrics-desktop-sponza",
+#   "metrics-jetsonhp-sponza",
+#   "metrics-jetsonlp-sponza",
 ]
 materials_list = [
-    "metrics-jetsonlp-materials",
-    "metrics-jetsonhp-materials",
     "metrics-desktop-materials",
+#   "metrics-jetsonhp-materials",
+#   "metrics-jetsonlp-materials",
 ]
 platformer_list = [
-    "metrics-jetsonlp-platformer",
-    "metrics-jetsonhp-platformer",
     "metrics-desktop-platformer",
+#   "metrics-jetsonhp-platformer",
+#   "metrics-jetsonlp-platformer",
 ]
 demo_list = [
     "metrics-desktop-demo",
-    "metrics-jetsonhp-demo",
-    "metrics-jetsonlp-demo",
+#   "metrics-jetsonhp-demo",
+#   "metrics-jetsonlp-demo",
 ]
 
 fps_spreadsheet_sponza = pd.DataFrame()
@@ -683,7 +683,8 @@ def populate_gpu(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
     account_names = ts.index.levels[0]
-    account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+    #account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+    account_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu']
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
     account_list.insert(0, "Run Name")
     data_frame = pd.DataFrame([], columns=account_list)
@@ -694,7 +695,8 @@ def populate_gpu(data_frame, name_list, csv_name):
         account_names = ts.index.levels[0]
 
         values = {"Run Name": run_name}
-        name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+        #name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+        name_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu']
         for idx, name in enumerate(name_list):
 
             formatted_name = replaced_names[name] if name in replaced_names else name
