@@ -600,6 +600,22 @@ replaced_names = {
     'hologram': 'Hologram',
 }
 
+timeseries_colors = {
+    'app': 'black',
+    'zed_imu_thread iter': 'royalblue',
+    'zed_camera_thread iter': 'brown',
+    'timewarp_gl iter': 'limegreen',
+    'hologram iter': 'teal',
+    'audio_encoding iter': 'deeppink',
+    'audio_decoding iter': 'orange',
+    'OpenVINS Camera': 'crimson',
+    'imu_integrator iter': 'purple',
+
+    # GPU Values
+    'timewarp_gl gpu': 'limegreen',
+    'hologram': 'teal',
+}
+
 def populate_fps(data_frame, name_list, csv_name):
     metrics_path = Path("..") / f"{name_list[0]}"
     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, m2p = get_data_cached(metrics_path)
@@ -752,15 +768,15 @@ def write_graphs(
             ys = ts.loc[account, "wall_time_duration"]
             xs = xs.iloc[10:]
             ys = ys.iloc[10:]
-            ax.plot(xs, ys, label=account)
+            name = replaced_names[account] if account in replaced_names else account
+            color = timeseries_colors[account]
+            ax.plot(xs, ys, label=name, color=color)
             ax.set_xlabel("Time (seconds after program start)")
             ax.set_ylabel("Wall-time Duration (ms)")
-            #print(account)
-            #print(ys)
-            #ys.to_csv(f"{account}.csv", index=False)
-        ax.legend()
-        ax.set_title("Wall-Time Duration by Component")
-        fig.savefig(metrics_path / "wall_time_durations.png")
+            ax.yaxis.grid(True)
+            ys.to_csv(metrics_path / f"{name}-time_series.csv", index=False)
+        ax.legend(loc='upper left', ncol=3)
+        fig.savefig(metrics_path / "wall_time_durations.pdf")
 
 populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
 populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
@@ -774,7 +790,7 @@ populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
 write_graphs(
     sponza_list + materials_list + platformer_list + demo_list,
-    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
+    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU'],
 )
 
     # # Stacked Energy Graphs
