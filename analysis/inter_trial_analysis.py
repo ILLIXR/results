@@ -5,11 +5,11 @@ from tqdm import tqdm
 import charmonium.time_block as ch_time_block
 
 def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    # populate_fps(trials, replaced_names)
+    populate_fps(trials, replaced_names)
     populate_cpu(trials, replaced_names)
     populate_gpu(trials, replaced_names)
     populate_power(trials, replaced_names)
-    # populate_mtp(trials, replaced_names)
+    populate_mtp(trials, replaced_names)
 
 @ch_time_block.decor(print_start=False, print_args=False)   
 def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
