@@ -6,11 +6,11 @@ import charmonium.time_block as ch_time_block
 
 def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     print("\U0001f600")
-    # populate_fps(trials, replaced_names)
+    populate_fps(trials, replaced_names)
     # populate_cpu(trials, replaced_names)
     # populate_gpu(trials, replaced_names)
     # populate_power(trials, replaced_names)
-    populate_mtp(trials, replaced_names)
+    # populate_mtp(trials, replaced_names)
     # populate_frame_time_mean(trials, replaced_names)
     # populate_frame_time_std(trials, replaced_names)
     # populate_frame_time_var_coeff(trials, replaced_names)
@@ -24,6 +24,9 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
 
     for trial in tqdm(trials):
         account_names = ['OpenVINS Camera', 'zed_camera_thread iter', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+        
+        import IPython; IPython.embed()
+        return
 
         values = []
         ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']

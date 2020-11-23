@@ -72,7 +72,7 @@ def plot_fps(trial_num):
     axes[0].set_xticks(np.arange(len(labels)) * 2)
     axes[0].set_xticklabels(labels)
     axes[0].set_xlabel('Perception Pipeline (Camera)', fontsize=18)
-    axes[0].set_ylabel('Time (ms)')
+    axes[0].set_ylabel('Rate (Hz)')
     axes[0].set_yticks(np.arange(6) * 3)
     axes[0].set_ylim(bottom=0, top=15.01)
     
@@ -137,7 +137,7 @@ def plot_cpu():
     desktop_sum = np.zeros(4)
     jetsonhp_sum = np.zeros(4)
     jetsonlp_sum = np.zeros(4)
-    colors = ['navy', 'steelblue', 'mediumturquoise', 'lightcoral', 'orange', 'saddlebrown', 'firebrick', 'yellowgreen']
+    colors = ['navy', 'steelblue', 'indigo', 'lightcoral', 'orange', 'saddlebrown', 'firebrick', 'yellowgreen']
 
     temp_bar_list = []
     for idx in range(len(desktop_bars)):
@@ -151,7 +151,7 @@ def plot_cpu():
         jetsonlp_sum += jetsonlp_bars[idx]
 
     axs.set_xticks(x)
-    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nDemo'])
+    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nAR Demo'])
     axs.set_yticklabels(['0%', '20%', '40%', '60%', '80%', '100%'])
     axs.set_ylim(bottom=0, top=100)
     axs.legend(temp_bar_list, ['Camera', 'SLAM', 'IMU', 'Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding',], loc='upper center', bbox_to_anchor=(0.5, -0.1),
@@ -210,7 +210,7 @@ def plot_gpu():
         jetsonlp_sum += jetsonlp_bars[idx]
 
     axs.set_xticks(x)
-    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nDemo'])
+    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nAR Demo'])
     axs.set_yticklabels(['0%', '20%', '40%', '60%', '80%', '100%'])
     axs.set_ylim(bottom=0, top=100)
     axs.legend(temp_bar_list, ['Application', 'Hologram', 'Reprojection'], loc='upper center', bbox_to_anchor=(0.5, -0.12),
@@ -267,7 +267,7 @@ def plot_power():
         temp_bar_list.append(temp_bar)
 
     axs.set_xticks(x)
-    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nDemo'])
+    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nAR Demo'])
     axs.set_yticklabels(['0%', '20%', '40%', '60%', '80%', '100%'])
     axs.set_ylim(bottom=0, top=100)
     axs.legend(temp_bar_list, ['CPU Power', 'GPU Power', 'DDR Power', 'SOC Power', 'SYS Power'], loc='upper center', bbox_to_anchor=(0.5, -0.12),
@@ -299,7 +299,7 @@ def plot_power_total():
     axs.bar(x + (width * 1.1), jetsonlp_bars, width, color='dimgray')        
 
     axs.set_xticks(x)
-    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nDemo'])
+    axs.set_xticklabels(['D     HP    LP\nSponza', 'D     HP    LP\nMaterials', 'D     HP    LP\nPlatformer', 'D     HP    LP\nAR Demo'])
     axs.set_yticklabels([10, 100, 1000])
     axs.set_yscale('log')
     axs.set_ylabel('Power (Watts)')
@@ -334,7 +334,6 @@ def plot_mtp(trial_list, title, max_y):
 
     plt.xlim(left=200, right=max_val)
     plt.ylim(bottom=0, top=max_y)
-    plt.title(title)
 
     plt.savefig('../Graphs/MTP_' + title + '.pdf')
 
