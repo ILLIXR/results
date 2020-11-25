@@ -622,7 +622,7 @@ def plot_cpu_ipc():
     axs.plot(x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, color='black')
 
     axs.set_xticks(x)
-    axs.set_xticklabels(['Open\nVINS', 'RITnet', 'Elastic\nFusion', 'Reproj.', 'Hologram', 'Audio\nEncoding', 'Audio\nPlayback'], fontsize=13)
+    axs.set_xticklabels(['VIO', 'Eye\nTracking', 'Scene\nReconst.', 'Reproj.', 'Hologram', 'Audio\nEncoding', 'Audio\nPlayback'], fontsize=13)
     axs.set_yticklabels(['0%', '20%', '40%', '60%', '80%', '100%'], fontsize=14)
     axs.set_ylabel('Cycle Breakdown (%)')
     axs.set_ylim(bottom=0, top=100)
@@ -632,7 +632,7 @@ def plot_cpu_ipc():
     axs2.set_yticklabels([0, 1, 2, 3, 4], fontsize=14)
     axs2.set_ylim(bottom=0, top=4.01)
 
-    axs.legend(bars, ['Retiring', 'Bad Speculation', 'Frontend Bound', 'Backend Bound', 'IPC'], loc='upper center', bbox_to_anchor=(0.46, -.26),
+    axs.legend(bars, ['Retiring', 'Bad Speculation', 'Frontend Bound', 'Backend Bound', 'IPC'], loc='upper center', bbox_to_anchor=(0.46, -.27),
             fancybox=False, shadow=False, ncol=5, prop={'size': 11})
     fig.tight_layout()
     fig.subplots_adjust(left=.13, right=.93, bottom=.33)
