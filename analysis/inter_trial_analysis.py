@@ -13,7 +13,8 @@ def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     # populate_mtp(trials, replaced_names)
     # populate_frame_time_mean(trials, replaced_names)
     # populate_frame_time_std(trials, replaced_names)
-    # populate_frame_time_var_coeff(trials, replaced_names)
+    # populate_frame_time_min(trials, replaced_names)
+    # populate_frame_time_max(trials, replaced_names)
 
 
 @ch_time_block.decor(print_start=False, print_args=False)   
@@ -24,9 +25,19 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
 
     for trial in tqdm(trials):
         account_names = ['OpenVINS Camera', 'zed_camera_thread iter', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
-        
-        import IPython; IPython.embed()
-        return
+
+        # if trial.conditions.machine == 'jetsonlp' and trial.conditions.application == 'materials':
+        #     # import IPython; IPython.embed()
+        #     ts_temp = trial.ts.reset_index()
+        #     testt = ts_temp[ts_temp["account_name"] == 'OpenVINS Camera']['wall_time_duration'].to_numpy()
+        #     counter = 0
+        #     for val in testt:
+        #         if val > 66.666666:
+        #             counter += 1
+            
+        #     print(counter)
+        #     print(len(testt))
+        #     return
 
         values = []
         ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
@@ -35,8 +46,18 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
                 continue
             
             # Convert ms to s and then convert period to hz
-            values.append(1 / (trial.summaries["period_mean"][name] * .001))
-        # values.append(trial.summaries["period_mean"]['app'])
+            if name == 'audio_decoding iter' or name == 'audio_encoding iter':
+                # First ~200 values seem to be garbage so omit those when calculating the mean
+                ts_temp = trial.ts.reset_index()
+                if trial.conditions.machine == 'jetsonlp':
+                    mean_period = ts_temp[ts_temp["account_name"] == name]['period'][150:].mean() 
+                elif trial.conditions.machine == 'jetsonhp':
+                    mean_period = ts_temp[ts_temp["account_name"] == name]['period'][100:].mean() 
+                else:
+                    mean_period = ts_temp[ts_temp["account_name"] == name]['period'][60:].mean() 
+                values.append(1 / (mean_period * .001))
+            else:
+                values.append(1 / (trial.summaries["period_mean"][name] * .001))
 
         data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
         data_frame.to_csv('../output/fps.csv', index=False)
@@ -57,8 +78,18 @@ def populate_frame_time_mean(trials: List[PerTrialData], replaced_names: Dict[st
             if name in ignore_list:
                 continue
             
-            ts_temp = trial.ts.reset_index()
-            mean = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].mean() 
+            if name == 'audio_decoding iter' or name == 'audio_encoding iter':
+                # First ~200 values seem to be garbage so omit those when calculating the mean
+                ts_temp = trial.ts.reset_index()
+                if trial.conditions.machine == 'jetsonlp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].mean() 
+                elif trial.conditions.machine == 'jetsonhp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].mean() 
+                else:
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].mean() 
+            else:
+                ts_temp = trial.ts.reset_index()
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'].mean() 
 
             values.append(mean)
 
@@ -81,8 +112,18 @@ def populate_frame_time_std(trials: List[PerTrialData], replaced_names: Dict[str
             if name in ignore_list:
                 continue
             
-            ts_temp = trial.ts.reset_index()
-            mean = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].std() 
+            if name == 'audio_decoding iter' or name == 'audio_encoding iter':
+                # First ~200 values seem to be garbage so omit those when calculating the mean
+                ts_temp = trial.ts.reset_index()
+                if trial.conditions.machine == 'jetsonlp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].std() 
+                elif trial.conditions.machine == 'jetsonhp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].std() 
+                else:
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].std() 
+            else:
+                ts_temp = trial.ts.reset_index()
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'].std() 
 
             values.append(mean)
 
@@ -90,17 +131,13 @@ def populate_frame_time_std(trials: List[PerTrialData], replaced_names: Dict[str
         data_frame.to_csv('../output/frame_time_std.csv', index=False)
 
 
-# Dont you love clean code cause same
 @ch_time_block.decor(print_start=False, print_args=False)   
-def populate_frame_time_var_coeff(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+def populate_frame_time_min(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
-
     data_frame = pd.DataFrame()
     data_frame["Components"] = account_list
-    for trial in tqdm(trials):
-        if trial.conditions.machine != 'desktop':
-            continue
 
+    for trial in tqdm(trials):
         account_names = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
 
         values = []
@@ -110,20 +147,26 @@ def populate_frame_time_var_coeff(trials: List[PerTrialData], replaced_names: Di
                 continue
             
             ts_temp = trial.ts.reset_index()
-            std_dev = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].std() 
-            mean = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].mean() 
+            if trial.conditions.machine == 'jetsonlp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].min() 
+            elif trial.conditions.machine == 'jetsonhp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].min() 
+            else:
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].min() 
 
-            values.append(std_dev/mean * 100)
+            values.append(mean)
 
         data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
-        data_frame.to_csv('../output/frame_time_var_coeff_desktop.csv', index=False)
+        data_frame.to_csv('../output/frame_time_min.csv', index=False)
 
+
+@ch_time_block.decor(print_start=False, print_args=False)   
+def populate_frame_time_max(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
     data_frame = pd.DataFrame()
     data_frame["Components"] = account_list
-    for trial in tqdm(trials):
-        if trial.conditions.machine != 'jetsonhp':
-            continue
 
+    for trial in tqdm(trials):
         account_names = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
 
         values = []
@@ -133,36 +176,17 @@ def populate_frame_time_var_coeff(trials: List[PerTrialData], replaced_names: Di
                 continue
             
             ts_temp = trial.ts.reset_index()
-            std_dev = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].std() 
-            mean = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].mean() 
+            if trial.conditions.machine == 'jetsonlp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].max() 
+            elif trial.conditions.machine == 'jetsonhp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].max() 
+            else:
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].max() 
 
-            values.append(std_dev/mean * 100)
-
-        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
-        data_frame.to_csv('../output/frame_time_var_coeff_jhp.csv', index=False)
-
-    data_frame = pd.DataFrame()
-    data_frame["Components"] = account_list
-    for trial in tqdm(trials):
-        if trial.conditions.machine != 'jetsonlp':
-            continue
-
-        account_names = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
-
-        values = []
-        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
-        for idx, name in enumerate(account_names):
-            if name in ignore_list:
-                continue
-            
-            ts_temp = trial.ts.reset_index()
-            std_dev = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].std() 
-            mean = ts_temp[ts_temp["account_name"] == name]['cpu_time_duration'].mean() 
-
-            values.append(std_dev/mean * 100)
+            values.append(mean)
 
         data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
-        data_frame.to_csv('../output/frame_time_var_coeff_jlp.csv', index=False)
+        data_frame.to_csv('../output/frame_time_max.csv', index=False)
 
 
 @ch_time_block.decor(print_start=False, print_args=False)   

@@ -618,34 +618,36 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
-# # Uncomment this block to enable spreadsheet generation
-trials: List[PerTrialData] = []
-for metrics_path in Path("../metrics").iterdir():
-    if not (metrics_path / "trial_conditions.yaml").exists():
-        warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
-        continue
-    with (metrics_path / "trial_conditions.yaml").open() as f: 
-        conditions: Dict[str, str] = yaml.safe_load(f)
-        conditions_obj = TrialConditions(**conditions)
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
-    output_path = Path("../output") / metrics_path.name
-    output_path.mkdir(exist_ok=True, parents=True)
-    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
-    trials.append(trial)
-    # per_trial_analysis(trial)
-inter_trial_analysis(trials, replaced_names)
+# Uncomment this block to enable spreadsheet generation
+# trials: List[PerTrialData] = []
+# for metrics_path in Path("../metrics").iterdir():
+#     if not (metrics_path / "trial_conditions.yaml").exists():
+#         warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
+#         continue
+#     with (metrics_path / "trial_conditions.yaml").open() as f: 
+#         conditions: Dict[str, str] = yaml.safe_load(f)
+#         conditions_obj = TrialConditions(**conditions)
+#     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+#     output_path = Path("../output") / metrics_path.name
+#     output_path.mkdir(exist_ok=True, parents=True)
+#     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+#     trials.append(trial)
+#     # per_trial_analysis(trial)
+# inter_trial_analysis(trials, replaced_names)
 
 # plot_graphs.plot_fps(0)
 # plot_graphs.plot_fps(1)
 # plot_graphs.plot_fps(2)
-# plot_graphs.plot_cpu()
+plot_graphs.plot_cpu()
 # # plot_graphs.plot_gpu()
 # plot_graphs.plot_power()
 # plot_graphs.plot_power_total()
-# plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'Sponza', 60)
-# plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'Materials', 30)
-# plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'Platformer', 30)
-# plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'AR', 20)
+# plot_graphs.plot_wall_time(trials)
+# plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'sponza', 60)
+# plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'materials', 30)
+# plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'platformer', 30)
+# plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'ar', 20)
 # plot_graphs.plot_frame_time(0)
 # plot_graphs.plot_frame_time(1)
 # plot_graphs.plot_frame_time(2)
+# plot_graphs.plot_cpu_ipc()
