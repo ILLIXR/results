@@ -619,6 +619,9 @@ def write_graphs(
         fig.savefig(metrics_path / "wall_time_durations.png")
 
 # Uncomment this block to enable spreadsheet generation
+# Also if you ever need data from the logs, uncomment this and pass the trials var to whatever function needs it
+# Go to the Analysis function in inter_trial_analysis and comment/uncomment whatever CSVs you want to generate
+
 # trials: List[PerTrialData] = []
 # for metrics_path in Path("../metrics").iterdir():
 #     if not (metrics_path / "trial_conditions.yaml").exists():
@@ -635,6 +638,9 @@ def write_graphs(
 #     # per_trial_analysis(trial)
 # inter_trial_analysis(trials, replaced_names)
 
+# The Following functions are used for the actual graph generation. Most of these read off of the CSVs generated in the above code block
+# plot_wall_time is the only one that doesnt read from CSVs and needs the above code block
+
 # plot_graphs.plot_fps(0)
 # plot_graphs.plot_fps(1)
 # plot_graphs.plot_fps(2)
@@ -650,4 +656,4 @@ def write_graphs(
 # plot_graphs.plot_frame_time(0)
 # plot_graphs.plot_frame_time(1)
 # plot_graphs.plot_frame_time(2)
-plot_graphs.plot_cpu_ipc()
+# plot_graphs.plot_cpu_ipc()

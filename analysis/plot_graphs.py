@@ -113,7 +113,10 @@ def plot_fps(trial_num):
         plt.savefig('../Graphs/fps-jlp.pdf')
 
 
-
+# For most of these stacked bar chart graphs, how they work is you have an array of arrays. Each inner array
+# has the heights for one level of every bar in the graph. So if theres three bars each with 10 stacked components, we would
+# have an array of 10 sub arrays. Each sub array would have 3 elements (one for each bar).
+# Next step is normalizing each bar to be the same height and eventually plotting it
 def plot_cpu():
     plt.clf()
     data = pd.read_csv('../output/cpu.csv').transpose()
@@ -136,6 +139,7 @@ def plot_cpu():
         platformer_bars.append([data['platformer-desktop'][idx] / data['platformer-desktop'].sum(), data['platformer-jetsonhp'][idx] / data['platformer-jetsonhp'].sum(), data['platformer-jetsonlp'][idx] / data['platformer-jetsonlp'].sum()])
         demo_bars.append([data['demo-desktop'][idx] / data['demo-desktop'].sum(), data['demo-jetsonhp'][idx] / data['demo-jetsonhp'].sum(), data['demo-jetsonlp'][idx] / data['demo-jetsonlp'].sum()])
 
+    # Normalize the bars to scale between 0-100
     sponza_bars = [[y*100 for y in x] for x in sponza_bars]
     materials_bars = [[y*100 for y in x] for x in materials_bars]
     platformer_bars = [[y*100 for y in x] for x in platformer_bars]
@@ -147,6 +151,8 @@ def plot_cpu():
     demo_sum = np.zeros(3)
     colors = ['saddlebrown', 'steelblue', 'indigo', 'lightcoral', 'orange', 'navy', 'firebrick', 'yellowgreen']
 
+    # This x +/- (width) nonesense is if we want grouped bars. x is the center point of the tick and all were doing is
+    # shifting each bar to the left or right of this center point
     temp_bar_list = []
     for idx in range(len(sponza_bars)):
         temp_bar = axs.bar(x - (width * 1.65), sponza_bars[idx], width, bottom=sponza_sum, color=colors[idx])
@@ -161,12 +167,17 @@ def plot_cpu():
         demo_sum += demo_bars[idx]
 
     axs.set_xticks(x)
+    # Need to do this gross spacing because we need two labels for the x axis which I dont think theres an easy way to do in matplotib
     axs.set_xticklabels([' S  M  P AR\nDesktop', ' S  M  P AR\nJetson LP', ' S  M  P AR\nJetson HP'], fontsize=14)
     axs.set_yticklabels(['0%', '20%', '40%', '60%', '80%', '100%'], fontsize=14)
     axs.set_ylim(bottom=0, top=100)
+    # bbox_to_anchor is an offfset used to move the legend around. (x direction, y direction). This offset if from the loc= variable
+    # loc specifies areas all around the graph (upper center, lower left, etc) and the offset offsets from that location
     axs.legend(temp_bar_list[::-1], ['Camera', 'VIO', 'IMU', 'Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding',], loc='upper left', bbox_to_anchor=(1, 1.05),
             fancybox=False, shadow=False, ncol=1, prop={'size': 12})
     fig.tight_layout()
+    # This specifies how the graph lines up in the bounding window. If you do a plt.show(), you can find a button that lets you adjust these values
+    # on the fly in the window that pops up.
     fig.subplots_adjust(left=.13, right=.70, bottom=.20)
     fig.set_size_inches(8, 2.5)
 
@@ -576,6 +587,7 @@ def plot_frame_time(trial_num):
 
 
 # Lol
+# This is graph 9 on the paper hopefully you wont have to touch this cause its hardcoded madness
 def plot_cpu_ipc():
     plt.clf()
     fig, axs = plt.subplots()
