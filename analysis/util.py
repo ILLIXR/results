@@ -24,7 +24,7 @@ def is_int(string: str) -> bool:
 def is_float(string: str) -> bool:
     return bool(re.match(r"^\d+.\d+(e[+-]\d+)?$", string))
 
-class TrialConditions (NamedTuple):
+class TrialConditions (NamedTuple): #https://dbader.org/blog/writing-clean-python-with-namedtuples
 
     # Something like "desktop", "jetson-lp", or "jetson-hp"
     machine: str 
@@ -35,7 +35,7 @@ class TrialConditions (NamedTuple):
     # Run `git rev-parse HEAD` in the ILLIXR repo to get this.
     illixr_commit: str 
 
-class PerTrialData(NamedTuple):
+class PerTrialData(NamedTuple): #https://dbader.org/blog/writing-clean-python-with-namedtuples
 
     # [t]ime[s]eries of each account (account is like "OpenVINS", "timewarp_gl", or "runtime").
     # Each row has "iteration_no" (index), "start_wall_time", "end_wall_time", etc.
