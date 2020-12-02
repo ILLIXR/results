@@ -328,7 +328,7 @@ def read_illixr_power(metrics_path: str):
         return (nvidia_power, perf_time, cpu_energy, ddr_energy)
 
 @ch_time_block.decor(print_start=False, print_args=True)
-def get_data(metrics_path: Path) -> Tuple[Any]:
+def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing-clean-python-with-namedtuples
     power_data = read_illixr_power(str(metrics_path))
 
     with warnings.catch_warnings(record=True) as warnings_log:
