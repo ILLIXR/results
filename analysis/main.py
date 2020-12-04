@@ -536,44 +536,6 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
 
-# TODO: use ../metrics/blah/ instead of ../metrics-blah/
-run_list = [
-    path.name.partition("-")[2]
-    for path in list(Path("..").iterdir())
-    if path.name.endswith("metrics-")
-]
-
-sponza_list = [
-    "metrics-jetsonlp-sponza",
-    "metrics-jetsonhp-sponza",
-    "metrics-desktop-sponza",
-]
-materials_list = [
-    "metrics-jetsonlp-materials",
-    "metrics-jetsonhp-materials",
-    "metrics-desktop-materials",
-]
-platformer_list = [
-    "metrics-jetsonlp-platformer",
-    "metrics-jetsonhp-platformer",
-    "metrics-desktop-platformer",
-]
-demo_list = [
-    "metrics-desktop-demo",
-    "metrics-jetsonhp-demo",
-    "metrics-jetsonlp-demo",
-]
-
-fps_spreadsheet_sponza = pd.DataFrame()
-fps_spreadsheet_materials = pd.DataFrame() 
-fps_spreadsheet_platformer = pd.DataFrame() 
-fps_spreadsheet_demo = pd.DataFrame() 
-
-power_spreadsheet = pd.DataFrame() 
-cpu_spreadsheet = pd.DataFrame() 
-gpu_spreadsheet = pd.DataFrame() 
-timeseries_spreadsheet = pd.DataFrame() 
-
 replaced_names = {
     'app': 'Application',
     'zed_imu_thread iter': 'IMU',
@@ -627,6 +589,7 @@ def write_graphs(
         ax.legend()
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
+<<<<<<< HEAD
 #populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
 #populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
 #populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
@@ -696,3 +659,27 @@ for metrics_path in Path("../metrics").iterdir():
 inter_trial_analysis(trials, replaced_names)
 
  
+=======
+
+
+# trials: List[PerTrialData] = []
+# for metrics_path in Path("../metrics").iterdir():
+#     if not (metrics_path / "trial_conditions.yaml").exists():
+#         warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
+#         continue
+#     with (metrics_path / "trial_conditions.yaml").open() as f: 
+#         conditions: Dict[str, str] = yaml.safe_load(f)
+#         conditions_obj = TrialConditions(**conditions)
+
+#     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+#     output_path = Path("../output") / metrics_path.name
+#     output_path.mkdir(exist_ok=True, parents=True)
+#     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+#     trials.append(trial)
+#     # per_trial_analysis(trial)
+# inter_trial_analysis(trials, replaced_names)
+
+plot_graphs.plot_fps()
+plot_graphs.plot_cpu()
+plot_graphs.plot_gpu()
+>>>>>>> 8138c56548921add5baca5613b1684e441e0f8b1
