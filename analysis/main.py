@@ -21,7 +21,6 @@ from util import list_concat, it_concat, dict_concat, is_int, is_float, TrialCon
 verify_integrity = True
 from per_trial_analysis import analysis as per_trial_analysis
 from inter_trial_analysis import analysis as inter_trial_analysis
-import plot_graphs
 
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
     db_path = metrics_path / (table_name + ".sqlite")
@@ -583,12 +582,23 @@ replaced_names = {
     'hologram iter': 'Hologram',
     'audio_encoding iter': 'Encoding',
     'audio_decoding iter': 'Playback',
-    'imu_integrator iter': 'IMU Integrator',
 
     # GPU Values
     'timewarp_gl gpu': 'Reprojection',
     'hologram': 'Hologram',
 }
+
+# Components on the X
+# Each run on the Y
+#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+
+# Components on the X
+# Each run on the Y
+#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+
+#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
+
+#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
 
 def write_graphs(
@@ -617,25 +627,72 @@ def write_graphs(
         ax.legend()
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
+#populate_fps(fps_spreadsheet_sponza, sponza_list, "sponza_fps.csv")
+#populate_fps(fps_spreadsheet_materials, materials_list, "materials_fps.csv")
+#populate_fps(fps_spreadsheet_platformer, platformer_list, "platformer_fps.csv")
+#populate_fps(fps_spreadsheet_demo, demo_list, "demo_fps.csv")
 
+#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
+#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
+#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
+#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
 
-# trials: List[PerTrialData] = []
-# for metrics_path in Path("../metrics").iterdir():
-#     if not (metrics_path / "trial_conditions.yaml").exists():
-#         warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
-#         continue
-#     with (metrics_path / "trial_conditions.yaml").open() as f: 
-#         conditions: Dict[str, str] = yaml.safe_load(f)
-#         conditions_obj = TrialConditions(**conditions)
+#write_graphs(
+#    sponza_list + materials_list + platformer_list + demo_list,
+#    ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu'],
+#)
 
-#     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
-#     output_path = Path("../output") / metrics_path.name
-#     output_path.mkdir(exist_ok=True, parents=True)
-#     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
-#     trials.append(trial)
-#     # per_trial_analysis(trial)
-# inter_trial_analysis(trials, replaced_names)
+    # # Stacked Energy Graphs
+    # if len(power_data) == 3:
+    #     gpu_power = power_data[0]
+    #     cpu_time = power_data[1]
+    #     cpu_energy = power_data[2]
+    #     # # Stacked Power Graphs Desktop
+    #     plt.clf()
+    #     cpu_power = cpu_energy / cpu_time
+    #     total_power = cpu_power + gpu_power
+    # else:
+    #     # # Stacked Power Graphs Jetson
+    #     plt.clf()
+    #     total_power = power_data[0]
+    #     width = 0.4
+    #     bar_plots = []
+    #     bar_plots.append(plt.bar(1, power_data[1], width=width, bottom=0)[0])
+    #     bar_plots.append(plt.bar(1, power_data[2], width=width, bottom= power_data[1])[0])
+    #     bar_plots.append(plt.bar(1, power_data[3], width=width, bottom= power_data[1] + power_data[2])[0])
+    #     bar_plots.append(plt.bar(1, power_data[4], width=width, bottom= power_data[1] + power_data[2] + power_data[3])[0])
+    #     bar_plots.append(plt.bar(1, power_data[5], width=width, bottom= power_data[1] + power_data[2] + power_data[3] + power_data[4])[0])
+    #     plt.title('Power Breakdown Per Run')
+    #     plt.xticks(np.arange(0, 1, step=1))
+    #     plt.yticks(np.arange(0, total_power+1, total_power/10))
+    #     plt.ylabel('Percent of Total Power')
+    #     plt.subplots_adjust(right=0.7)
+    #     plt.legend([x for x in bar_plots], ['GPU Power', 'DDR Power', 'CPU Power', 'SOC Power', 'SYS Power'], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
+    #     plt.xlabel("Full System")
+    #     plt.savefig(output_path / "stacked_power.png")
+    #     print(power_data[1])
+    #     print(power_data[2])
+    #     print(power_data[3])
+    #     print(power_data[4])
+    #     print(power_data[5])
 
-plot_graphs.plot_fps()
-plot_graphs.plot_cpu()
-plot_graphs.plot_gpu()
+    # # import IPython; IPython.embed()
+    # # print(summaries["cpu_time_duration_sum"].to_csv())
+
+trials: List[PerTrialData] = []
+for metrics_path in Path("../metrics").iterdir():
+    if not (metrics_path / "trial_conditions.yaml").exists():
+        warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
+        continue
+    with (metrics_path / "trial_conditions.yaml").open() as f: 
+        conditions: Dict[str, str] = yaml.safe_load(f)
+        conditions_obj = TrialConditions(**conditions)
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+    output_path = Path("../output") / metrics_path.name
+    output_path.mkdir(exist_ok=True, parents=True)
+    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+    trials.append(trial)
+    per_trial_analysis(trial)
+inter_trial_analysis(trials, replaced_names)
+
+ 

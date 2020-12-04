@@ -19,7 +19,7 @@ def analysis(data: PerTrialData) -> None:
     #motion_to_photon(data)
     cpu_timeline(data)
 
-@ch_time_block.decor(print_start=False, print_args=False)   
+@ch_time_block.decor(print_start=False, print_args=False)
 def table_summaries(data: PerTrialData) -> None:
     with (data.output_path / "account_summaries.md").open("w") as f:
         f.write("# Summaries\n\n")
@@ -54,7 +54,7 @@ def table_summaries(data: PerTrialData) -> None:
             f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
             f.write("\n\n")
 
-@ch_time_block.decor(print_start=False, print_args=False)      
+@ch_time_block.decor(print_start=False, print_args=False)
 def stacked_cpu_time(data: PerTrialData) -> None:
     replaced_names = {
         'app': 'Application',
@@ -105,7 +105,7 @@ def stacked_cpu_time(data: PerTrialData) -> None:
     plt.savefig(data.output_path / "stacked.png")
     plt.close()
   
-@ch_time_block.decor(print_start=False, print_args=False)  
+@ch_time_block.decor(print_start=False, print_args=False)
 def stacked_gpu_time(data: PerTrialData) -> None:
     gpu_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     total_gpu_time = 0.0
@@ -133,7 +133,7 @@ def stacked_gpu_time(data: PerTrialData) -> None:
     plt.savefig(data.output_path / "stacked_gpu.png")
     plt.close()
 
-@ch_time_block.decor(print_start=False, print_args=False)    
+@ch_time_block.decor(print_start=False, print_args=False)
 def stacked_energy(data: PerTrialData) -> None:
     #plt.clf()
     #gpu_energy = gpu_power * cpu_time
