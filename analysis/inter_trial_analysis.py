@@ -7,26 +7,113 @@ from typing import List, Dict
 from tqdm import tqdm
 import charmonium.time_block as ch_time_block
 
-def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    # populate_fps(trials, replaced_names)
-    populate_cpu(trials, replaced_names)
-    populate_gpu(trials, replaced_names)
-    populate_power(trials, replaced_names)
-    # populate_mtp(trials, replaced_names)
+def analysis(trials: List[PerTrialData]) -> None:
+    for trial in trials:
+        # make sure all trials  the same ILLIXR commit
+        assert trial.conditions.illixr_commit == trials[0].conditions.illixr_commit, (
+            f"{trial.conditions} is from a different commit than {trials[0].conditions}"
+        )
+        # make sure all trials have the same components
+        assert set(trial.summaries.index) == set(trials[0].summaries.index)
+
+    trials_df = pd.concat({
+        (trial.conditions.machine, trial.conditions.application): trial.summaries
+        for trial in trials
+    }, names=["machine", "app"]).sort_index()
+
+    # trials_df is a DataFrame,
+    # whose index is (machine, application, account_name)
+    # whose columns are `["period_mean", "period_std", ..., *rows in trial.summaries]`
+
+    # Access them using `trials_df.loc[(machine_name, application_name, account_name), column_name]`
+    # `slice(None)` for the values in the index tuple refers to "all" values of that index.
+    # If an index at the end is omitted, is implicitly `slice(None)`.
+    # `:` for the column_name refers to all columns
+    # If the column is :, that is equivalent to `slice(None)`
+
+    # For example:
+    #     trials_df.loc[(slice(None), application_name), "period_mean"]
+    # returns a Series whose index is (machine_name, account_name) and whose values are from "period_mean"
+
+    print("\U0001f600")
+    plot_freq(trials_df)
+    # populate_cpu(trials)
+    # populate_gpu(trials)
+    # populate_power(trials)
+    # populate_mtp(trials)
+    # populate_frame_time_mean(trials)
+    # populate_frame_time_std(trials)
+    # populate_frame_time_min(trials)
+    # populate_frame_time_max(trials)
+
+
+ms_to_s = 1e-3
 
 @ch_time_block.decor(print_start=False, print_args=False)   
-def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    # account_names = trials[0].ts.index.levels[0]
-    # ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    # account_list = [name for name in account_names if name not in ignore_list]
-    # account_list.append('app') 
-    # account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
-    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Hologram', 'Playback', 'Encoding']
-    data = pd.DataFrame()
-    data["Components"] = account_list
+def plot_freq(trials_df: pd.DataFrame) -> None:
+    # Parameters:
+    account_groups = [
+        (15 , 3  , "Perception (Camera)", ["Camera"  , "VIO"         ,]),
+        (500, 100, "Perception (IMU)"   , ["IMU"     , "Integrator"  ,]),
+        (120, 15 , "Visual"             , ["App"     , "Reprojection",]),
+        (48 , 6  , "Audio"              , ["Playback", "Encoding"    ,]),
+    ]
+    colors = "darkred indigo royalblue green".split(" ")
+    bar_width = 0.35
+    intragroup_gap = 0.2 * bar_width
+    intergroup_gap = 1.1 * bar_width
+    size_inches = (8, 2.5)
+    ylabel_fontsize = 14
+    xlabel_fontsize = 11
+    n_yticks = 6
+    ylabel = "Rate (Hz)"
+    subplots_adjust = dict(wspace=.30, hspace=.18)
+    width_ratios = [2, 2, 2, 2]
+    output_path = Path() / ".." / "Graphs" / "freq" 
+
+
+    trials_df = trials_df.copy()
+    # Omitting all indices (passing empty-tuple) means "all indices"
+    trials_df.loc[(), "freq"] = 1 / (ms_to_s * trials_df.loc[(), "period_mean"])
+
+    output_path.mkdir(exist_ok=True, parents=True)
+
+    for machine in trials_df.index.levels[0]:
+        fig, axes = plt.subplots(1, len(account_groups), gridspec_kw=dict(width_ratios=width_ratios))
+        axes[0].set_ylabel(ylabel, fontsize=ylabel_fontsize)
+        for ax, (ymax, ystep, title, accounts) in zip(axes, account_groups):
+            apps = list(trials_df.loc[(machine,), :].index.levels[0])
+            account_width = sum([
+                bar_width * len(apps),
+                intragroup_gap * (len(apps) - 1),
+                intergroup_gap,
+            ])
+            account_centers = np.arange(len(accounts)) * account_width
+            ax.set_xticks(account_centers)
+            ax.set_xticklabels(accounts, fontsize=xlabel_fontsize)
+            ax.set_xlabel(title, fontsize=ylabel_fontsize)
+            ax.set_yticks(np.arange(n_yticks) * ystep)
+            ax.set_ylim(0, ymax + 0.01)
+            for account_no, (account_center, account) in enumerate(zip(account_centers, accounts)):
+                for app_no, (color, app) in enumerate(zip(colors, apps)):
+                    bar_left = account_center + (app_no - len(apps) / 2) * (bar_width + intragroup_gap) + intergroup_gap * 0.5
+                    bar_height = trials_df.loc[(machine, app, account), "freq"]
+                    print(bar_left, bar_height / ymax)
+                    ax.bar(bar_left, bar_height, width=bar_width, label=app, color=color)
+
+        fig.set_size_inches(*size_inches)
+        fig.tight_layout()
+        fig.subplots_adjust(**subplots_adjust)
+        fig.savefig(output_path/ f"{machine}.pdf")
+
+@ch_time_block.decor(print_start=False, print_args=False)   
+def populate_frame_time_mean(trials: List[PerTrialData]) -> None:
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
+    data_frame = pd.DataFrame()
+    data_frame["Components"] = account_list
 
     for trial in tqdm(trials):
-        account_names = trial.ts.index.levels[0]
+        account_names = ['zed_camera_thread iter', 'OpenVINS Camera',  'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
 
         values = []
         ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
@@ -34,105 +121,123 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
             if name in ignore_list:
                 continue
             
-            values.append(trial.summaries["period_mean"][name])
-        # values.append(trial.summaries["period_mean"]['app'])
+            if name == 'audio_decoding iter' or name == 'audio_encoding iter':
+                # First ~200 values seem to be garbage so omit those when calculating the mean
+                ts_temp = trial.ts.reset_index()
+                if trial.conditions.machine == 'jetsonlp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].mean() 
+                elif trial.conditions.machine == 'jetsonhp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].mean() 
+                else:
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].mean() 
+            else:
+                ts_temp = trial.ts.reset_index()
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'].mean() 
 
-        print(values)
-        data[trial.conditions.application + '-' + trial.conditions.machine] = values
+            values.append(mean)
 
-    data = data.reset_index(drop=True).transpose()
-
-    fig, axes = plt.subplots(1, 4, gridspec_kw={'width_ratios': [2, 2, 3, 2]})
-
-    def create_row(data: pd.DataFrame, ax_row: List[plt.Axes], trials: List[str]) -> None:
-        width = 0.35  # the width of the bars
-
-        labels = ['Camera','OpenVINS Camera']
-        x = np.arange(len(labels)) * 2  # the label locations
-        sponza_fps = data[trials[0]][0:2]
-        platformer_fps = data[trials[1]][0:2]
-        materials_fps = data[trials[2]][0:2]
-        demo_fps = data[trials[3]][0:2]
-
-        ax_row[0].bar(x - (width * 1.5), sponza_fps, width, label='Sponza')
-        ax_row[0].bar(x - (width * 0.5), platformer_fps, width, label='Platformer')
-        ax_row[0].bar(x + (width * 0.5), materials_fps, width, label='Materials')
-        ax_row[0].bar(x + (width * 1.5), demo_fps, width, label='AR Demo')
-
-        labels = ['IMU', 'IMU Integrator']
-        x = np.arange(len(labels)) * 2  # the label locations
-        sponza_fps = data[trials[0]][2:4]
-        platformer_fps = data[trials[1]][2:4]
-        materials_fps = data[trials[2]][2:4]
-        demo_fps = data[trials[3]][2:4]
-
-        ax_row[1].bar(x - (width * 1.5), sponza_fps, width, label='Sponza')
-        ax_row[1].bar(x - (width * 0.5), platformer_fps, width, label='Platformer')
-        ax_row[1].bar(x + (width * 0.5), materials_fps, width, label='Materials')
-        ax_row[1].bar(x + (width * 1.5), demo_fps, width, label='AR Demo')
-
-        labels = ['Applicaton', 'Reprojection', 'Hologram']
-        x = np.arange(len(labels)) * 2  # the label locations
-        sponza_fps = data[trials[0]][4:7]
-        platformer_fps = data[trials[1]][4:7]
-        materials_fps = data[trials[2]][4:7]
-        demo_fps = data[trials[3]][4:7]
-
-        ax_row[2].bar(x - (width * 1.5), sponza_fps, width, label='Sponza')
-        ax_row[2].bar(x - (width * 0.5), platformer_fps, width, label='Platformer')
-        ax_row[2].bar(x + (width * 0.5), materials_fps, width, label='Materials')
-        ax_row[2].bar(x + (width * 1.5), demo_fps, width, label='AR Demo')
-
-        labels = ['Playback', 'Encoding']
-        x = np.arange(len(labels)) * 2  # the label locations
-        sponza_fps = data[trials[0]][7:9]
-        platformer_fps = data[trials[1]][7:9]
-        materials_fps = data[trials[2]][7:9]
-        demo_fps = data[trials[3]][7:9]
-
-        ax_row[3].bar(x - (width * 1.5), sponza_fps, width, label='Sponza')
-        ax_row[3].bar(x - (width * 0.5), platformer_fps, width, label='Platformer')
-        ax_row[3].bar(x + (width * 0.5), materials_fps, width, label='Materials')
-        ax_row[3].bar(x + (width * 1.5), demo_fps, width, label='AR Demo')
-
-    # Uncomment one of these at a time depending on if you want to gen Desktop/Jetson HP/Jetson LP FPS values
-    create_row(data, axes, ['sponza-desktop', 'platformer-desktop', 'materials-desktop', 'demo-desktop'])
-    # create_row(data, axes[1], ['sponza-jetsonhp', 'platformer-jetsonhp', 'materials-jetsonhp', 'demo-jetsonhp'])
-    # create_row(data, axes[2], ['sponza-jetsonlp', 'platformer-jetsonlp', 'materials-jetsonlp', 'demo-jetsonlp'])
-
-    axes[0].legend()
-
-    labels = ['Camera','OpenVINS Camera']
-    axes[0].set_xticks(np.arange(len(labels)) * 2)
-    axes[0].set_xticklabels(labels)
-    axes[0].set_xlabel('Perception Pipeline (Camera)', fontsize=18)
-    labels = ['IMU', 'IMU Integrator']
-    axes[1].set_xticks(np.arange(len(labels)) * 2)
-    axes[1].set_xticklabels(labels)
-    axes[1].set_xlabel('Perception Pipeline (IMU)', fontsize=18)
-    labels = ['Applicaton', 'Reprojection', 'Hologram']
-    axes[2].set_xticks(np.arange(len(labels)) * 2)
-    axes[2].set_xticklabels(labels)
-    axes[2].set_xlabel('Visual Pipeline', fontsize=18)
-    labels = ['Playback', 'Encoding']
-    axes[3].set_xticks(np.arange(len(labels)) * 2)
-    axes[3].set_xticklabels(labels)
-    axes[3].set_xlabel('Audio Pipeline', fontsize=18)
-
-    fig.set_size_inches(16, 4)
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=.1, hspace=.1)
-
-    fig.savefig(Path() / ".." / "output" / "fps.png")
-    plt.close()
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
+        data_frame.to_csv('../output/frame_time_mean.csv', index=False)
 
 
 @ch_time_block.decor(print_start=False, print_args=False)   
-def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+def populate_frame_time_std(trials: List[PerTrialData]) -> None:
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
+    data_frame = pd.DataFrame()
+    data_frame["Components"] = account_list
+
+    for trial in tqdm(trials):
+        account_names = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+
+        values = []
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
+        for idx, name in enumerate(account_names):
+            if name in ignore_list:
+                continue
+            
+            if name == 'audio_decoding iter' or name == 'audio_encoding iter':
+                # First ~200 values seem to be garbage so omit those when calculating the mean
+                ts_temp = trial.ts.reset_index()
+                if trial.conditions.machine == 'jetsonlp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].std() 
+                elif trial.conditions.machine == 'jetsonhp':
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].std() 
+                else:
+                    mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].std() 
+            else:
+                ts_temp = trial.ts.reset_index()
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'].std() 
+
+            values.append(mean)
+
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
+        data_frame.to_csv('../output/frame_time_std.csv', index=False)
+
+
+@ch_time_block.decor(print_start=False, print_args=False)   
+def populate_frame_time_min(trials: List[PerTrialData]) -> None:
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
+    data_frame = pd.DataFrame()
+    data_frame["Components"] = account_list
+
+    for trial in tqdm(trials):
+        account_names = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+
+        values = []
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
+        for idx, name in enumerate(account_names):
+            if name in ignore_list:
+                continue
+            
+            ts_temp = trial.ts.reset_index()
+            if trial.conditions.machine == 'jetsonlp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].min() 
+            elif trial.conditions.machine == 'jetsonhp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].min() 
+            else:
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].min() 
+
+            values.append(mean)
+
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
+        data_frame.to_csv('../output/frame_time_min.csv', index=False)
+
+
+@ch_time_block.decor(print_start=False, print_args=False)   
+def populate_frame_time_max(trials: List[PerTrialData]) -> None:
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
+    data_frame = pd.DataFrame()
+    data_frame["Components"] = account_list
+
+    for trial in tqdm(trials):
+        account_names = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+
+        values = []
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
+        for idx, name in enumerate(account_names):
+            if name in ignore_list:
+                continue
+            
+            ts_temp = trial.ts.reset_index()
+            if trial.conditions.machine == 'jetsonlp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][150:].max() 
+            elif trial.conditions.machine == 'jetsonhp':
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][100:].max() 
+            else:
+                mean = ts_temp[ts_temp["account_name"] == name]['wall_time_duration'][60:].max() 
+
+            values.append(mean)
+
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
+        data_frame.to_csv('../output/frame_time_max.csv', index=False)
+
+
+@ch_time_block.decor(print_start=False, print_args=False)   
+def populate_cpu(trials: List[PerTrialData]) -> None:
     account_names = trials[0].ts.index.levels[0]
-    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
-    account_list = [name for name in account_names if name not in ignore_list]
-    account_list.append('app') 
+    ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
+    account_list = ['zed_camera_thread iter', 'OpenVINS Camera', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
     account_list.insert(0, "Run Name")
     data = pd.DataFrame([], columns=account_list)
@@ -147,7 +252,6 @@ def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
 
             formatted_name = replaced_names[name] if name in replaced_names else name
             values.update({formatted_name: trial.summaries["cpu_time_duration_sum"][name]})
-        values.update({"Application": trial.summaries["cpu_time_duration_sum"]['app']})
 
         data = data.append(values, ignore_index=True, sort=False)
         # from IPython import embed; embed()
@@ -195,8 +299,9 @@ def populate_cpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
     fig.savefig(Path() / ".." / "output" / "cpu.png")
     plt.close()
 
+
 @ch_time_block.decor(print_start=False, print_args=False)   
-def populate_gpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+def populate_gpu(trials: List[PerTrialData]) -> None:
     account_names = trials[0].ts.index.levels[0]
     account_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
@@ -207,7 +312,7 @@ def populate_gpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
         account_names = trial.ts.index.levels[0]
 
         values = {"Run Name": trial.conditions.application + '-'+ trial.conditions.machine}
-        name_list = ['app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu']
+        name_list = ['app_gpu1', 'app_gpu2', 'timewarp_gl gpu']
         for idx, name in enumerate(name_list):
 
             formatted_name = replaced_names[name] if name in replaced_names else name
@@ -270,7 +375,7 @@ def populate_gpu(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
     plt.close()
 
 @ch_time_block.decor(print_start=False, print_args=False)
-def populate_power(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+def populate_power(trials: List[PerTrialData]) -> None:
     account_names = trials[0].ts.index.levels[0]
     account_list = ['CPU Power', 'GPU Power', 'DDR Power', 'SOC Power', 'SYS Power']
     account_list.insert(0, "Run Name")
@@ -297,8 +402,19 @@ def populate_power(trials: List[PerTrialData], replaced_names: Dict[str,str]) ->
 
     data_frame.to_csv('../output/power.csv', index=False)
 
+
 @ch_time_block.decor(print_start=False, print_args=False)    
-def populate_mtp(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
+def populate_mtp(trials: List[PerTrialData]) -> None:
     for trial in tqdm(trials):
         trial.mtp.to_csv(trial.output_path / "mtp.csv", index=False)
+
+    account_list = ['Mean', 'Std Dev']
+    data_frame = pd.DataFrame()
+    data_frame["Components"] = account_list
+
+    for trial in tqdm(trials):
+        values = [trial.mtp['imu_to_display'][200:].mean(), trial.mtp['imu_to_display'][200:].std()]
+        data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
+
+    data_frame.to_csv('../output/MTP_Vals.csv', index=False)
 

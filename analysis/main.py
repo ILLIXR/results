@@ -12,8 +12,6 @@ import warnings
 from tqdm import tqdm
 import charmonium.time_block as ch_time_block
 import charmonium.cache as ch_cache
-import seaborn as sns
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import subprocess
@@ -265,20 +263,11 @@ def concat_accounts(
         ], verify_integrity=verify_integrity).sort_index()
 
 def rename_accounts(ts: pd.DataFrame, renames: Dict[str, str]) -> pd.DataFrame:
-    # need to reset index to mutate it
-    ts = ts.assign(
-        account_name=ts.index.droplevel(1),
-        iteration_no=ts.index.droplevel(0),
-    )
-
-    for old_account_name, new_account_name in renames.items():
-        ts.loc[ts["account_name"] == old_account_name, "account_name"] = new_account_name
-
     return (
         ts
-        .reset_index(drop=True)
-        .sort_values(["account_name", "iteration_no"])
-        .set_index(["account_name", "iteration_no"], verify_integrity=verify_integrity)
+        .set_index(
+            ts.index.map(lambda index: (renames.get(index[0], index[0]), index[1]))
+        )
         .sort_index()
     )
 
@@ -532,43 +521,16 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
 
         return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp
 
-# @ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
+@ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
     return get_data(metrics_path)
-
-replaced_names = {
-    'app': 'Application',
-    'zed_imu_thread iter': 'IMU',
-    'zed_camera_thread iter': 'Camera',
-    'timewarp_gl iter': 'Reprojection',
-    'hologram iter': 'Hologram',
-    'audio_encoding iter': 'Encoding',
-    'audio_decoding iter': 'Playback',
-
-    # GPU Values
-    'timewarp_gl gpu': 'Reprojection',
-    'hologram': 'Hologram',
-}
-
-# Components on the X
-# Each run on the Y
-#populate_cpu(cpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "cpu_spreadsheet.csv")
-
-# Components on the X
-# Each run on the Y
-#populate_gpu(gpu_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "gpu_spreadsheet.csv")
-
-#populate_power(power_spreadsheet, sponza_list + materials_list + platformer_list + demo_list, "power_spreadsheet.csv")
-
-#populate_mtp(sponza_list + materials_list + platformer_list + demo_list)
-
 
 def write_graphs(
         name_list: List[str],
         ignore_accounts=List[str],
 ) -> None:
     for run_name in tqdm(name_list):
-        metrics_path = Path("..") / f"{run_name}"
+        metrics_path = Path("../metrics") / f"{run_name}"
         ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
 
         accounts = ts.index.levels[0]
@@ -590,18 +552,74 @@ def write_graphs(
         ax.set_title("Wall-Time Duration by Component")
         fig.savefig(metrics_path / "wall_time_durations.png")
 
+def correct(conditions: TrialConditions, ts: pd.DataFrame, summaries: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    # First ~200 values seem to be garbage so omit those when calculating the mean
+    first_good_audio_iter = {
+        'jetsonlp': 150,
+        'jetsonhp': 100
+    }.get(conditions.machine, 60)
+    summaries = summaries.copy()
+    for xcoding in ["decoding", "encoding"]:
+        summaries.loc[f"audio_{xcoding} iter", "period_mean"] = ts.loc[f"audio_{xcoding} iter", "period"][first_good_audio_iter:].mean()
+        summaries.loc[f"audio_{xcoding} iter", "period_std" ] = ts.loc[f"audio_{xcoding} iter", "period"][first_good_audio_iter:].std ()
+
+    replace_names = {
+        'app': 'App',
+        'zed_imu_thread iter': 'IMU',
+        'zed_camera_thread iter': 'Camera',
+        "OpenVINS Camera": "VIO",
+        'timewarp_gl iter': 'Reprojection',
+        'hologram iter': 'Hologram',
+        'audio_encoding iter': 'Encoding',
+        'audio_decoding iter': 'Playback',
+        'imu_integrator iter': "Integrator",
+
+        # GPU Values
+        # 'timewarp_gl gpu': 'Reprojection',
+        'hologram': 'Hologram',
+    }
+    ts = rename_accounts(ts, replace_names)
+    summaries = summaries.set_index(summaries.index.map(lambda name: replace_names.get(name, name)))
+    return ts, summaries
+
 trials: List[PerTrialData] = []
 for metrics_path in Path("../metrics").iterdir():
+
     if not (metrics_path / "trial_conditions.yaml").exists():
         warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
         continue
+
     with (metrics_path / "trial_conditions.yaml").open() as f: 
-        conditions: Dict[str, str] = yaml.safe_load(f)
-        conditions_obj = TrialConditions(**conditions)
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+        conditions = TrialConditions(**yaml.safe_load(f))
+
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
+    ts, summaries = correct(conditions, ts, summaries)
+
     output_path = Path("../output") / metrics_path.name
     output_path.mkdir(exist_ok=True, parents=True)
-    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+
+    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions, power_data = power_data)
+    # per_trial_analysis(trial)
     trials.append(trial)
-    per_trial_analysis(trial)
-inter_trial_analysis(trials, replaced_names)
+
+inter_trial_analysis(trials)
+
+# The Following functions are used for the actual graph generation. Most of these read off of the CSVs generated in the above code block
+# plot_wall_time is the only one that doesnt read from CSVs and needs the above code block
+
+# plot_graphs.plot_fps(0)
+# plot_graphs.plot_fps(1)
+# plot_graphs.plot_fps(2)
+# plot_graphs.plot_cpu()
+# # plot_graphs.plot_gpu()
+# plot_graphs.plot_power()
+# plot_graphs.plot_power_total()
+# plot_graphs.plot_wall_time(trials)
+# plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'sponza', 60)
+# plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'materials', 30)
+# plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'platformer', 30)
+# plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'ar', 20)
+# plot_graphs.plot_frame_time(0)
+# plot_graphs.plot_frame_time(1)
+# plot_graphs.plot_frame_time(2)
+# plot_graphs.plot_cpu_ipc()
