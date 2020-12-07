@@ -11,13 +11,15 @@ clocks = ["cpu", "wall", "gpu"]
     
 def analysis(data: PerTrialData) -> None:
     table_summaries(data)
-    stacked_cpu_time(data)
-    stacked_gpu_time(data)
-    stacked_energy(data)
-    time_series(data)
-    account_time_series(data)
-    #motion_to_photon(data)
-    cpu_timeline(data)
+    export_csv(data)
+    # stacked_cpu_time(data)
+    # stacked_gpu_time(data)
+    # stacked_energy(data)
+    # time_series(data)
+    # account_time_series(data)
+    account_time_hists(data)
+    # motion_to_photon(data)
+    # cpu_timeline(data)
 
 @ch_time_block.decor(print_start=False, print_args=False)
 def table_summaries(data: PerTrialData) -> None:
@@ -38,9 +40,9 @@ def table_summaries(data: PerTrialData) -> None:
         f.write("\n\n")
         f.write("# Notes\n\n")
         f.write("- All times are in milliseconds unless otherwise mentioned.\n")
-        f.write("- Total wall runtime = {:.1f} sec\n".format(
-            (data.ts.loc["timewarp_gl iter", "wall_time_stop"].max() - data.ts.loc["timewarp_gl iter", "wall_time_start"].min()) / 1e3
-        ))
+        # f.write("- Total wall runtime = {:.1f} sec\n".format(
+        #     (data.ts.loc["timewarp_gl iter", "wall_time_stop"].max() - data.ts.loc["timewarp_gl iter", "wall_time_start"].min()) / 1e3
+        # ))
         f.write("\n\n")
         f.write("# Warnings\n\n")
         for warning in data.warnings_log:
@@ -53,6 +55,10 @@ def table_summaries(data: PerTrialData) -> None:
             df = data.ts.loc[account_name]
             f.write(pd.concat([df.head(20), df.tail(20)]).to_markdown())
             f.write("\n\n")
+
+@ch_time_block.decor(print_start=False, print_args=False)
+def export_csv(data: PerTrialData) -> None:
+    data.ts.to_csv(data.output_path / "ts.csv")
 
 @ch_time_block.decor(print_start=False, print_args=False)
 def stacked_cpu_time(data: PerTrialData) -> None:
@@ -200,6 +206,26 @@ def account_time_series(data: PerTrialData) -> None:
         ax.set(ylabel='CPU Time (ms)')
         plt.xlabel("Timestamp (ms)")
         plt.yscale("log")
+        plt.savefig(ts_dir / f"{account_name}.png")
+        plt.close()
+    
+@ch_time_block.decor(print_start=False, print_args=False)
+def account_time_hists(data: PerTrialData) -> None:
+    ts_dir = data.output_path / "hist"
+    ts_dir.mkdir(exist_ok=True)
+    account_names = data.ts.index.levels[0]
+    for i, account_name in enumerate(account_names):
+        f = plt.figure()
+        f.tight_layout(pad=2.0)
+        plt.rcParams.update({'font.size': 8})
+        # plot the same data on both axes
+        ax = f.gca()
+        data2= data.ts.loc[account_name, "cpu_time_duration"].to_numpy()
+        data2 = data2[~np.isnan(data2)]
+        if len(data2):
+            ax.hist(data2, bins=100)
+        ax.set_title(f"{account_name} CPU Time Histogram")
+        plt.xlabel("CPU Time (ms)")
         plt.savefig(ts_dir / f"{account_name}.png")
         plt.close()
 

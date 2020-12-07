@@ -20,6 +20,8 @@ verify_integrity = True
 from per_trial_analysis import analysis as per_trial_analysis
 from inter_trial_analysis import analysis as inter_trial_analysis
 
+concat_slam = False
+
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
     db_path = metrics_path / (table_name + ".sqlite")
     assert db_path.exists()
@@ -400,7 +402,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
             )
 
         switchboard_topic_stop = switchboard_topic_stop.assign(
-            completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
+            # completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
+            completion = 1.0
         )
         for row in switchboard_topic_stop.itertuples():
             if row.completion < 0.95 and row.unprocessed > 0:
@@ -470,15 +473,23 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
             ts = reindex(ts, ["slam2 cb cam"])
 
         with ch_time_block.ctx("concat accounts", print_start=False):
-            # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
-            ts = concat_accounts(ts, "slam2 hist l", "slam2 cb cam", "slam2 cb cam")
-            ts = concat_accounts(ts, "slam2 hist r", "slam2 cb cam", "slam2 cb cam")
-            ts = concat_accounts(ts, "slam2 matching l", "slam2 cb cam", "slam2 cb cam")
-            ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
-            ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
-            ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
-            ts.loc["opencv", "wall_time_start"] += ts.loc["slam2 cb cam", "wall_time_start"].iloc[0]
-            ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
+            if concat_slam:
+                raise RuntimeError
+                # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
+                ts = concat_accounts(ts, "slam2 hist l", "slam2 cb cam", "slam2 cb cam")
+                ts = concat_accounts(ts, "slam2 hist r", "slam2 cb cam", "slam2 cb cam")
+                ts = concat_accounts(ts, "slam2 matching l", "slam2 cb cam", "slam2 cb cam")
+                ts = concat_accounts(ts, "slam2 matching r", "slam2 cb cam", "slam2 cb cam")
+                ts = concat_accounts(ts, "slam2 pyramid l", "slam2 cb cam", "slam2 cb cam")
+                ts = concat_accounts(ts, "slam2 pyramid r", "slam2 cb cam", "slam2 cb cam")
+                ts.loc["opencv", "wall_time_start"] += ts.loc["slam2 cb cam", "wall_time_start"].iloc[0]
+                ts = concat_accounts(ts, "opencv", "slam2 cb cam", "slam2 cb cam")
+            else:
+                pass
+                # ts = concat_accounts(ts, "slam2 hist l", "slam2 hist r", "slam hist")
+                # ts = concat_accounts(ts, "slam2 matching l", "slam2 matching r", "slam2 matching")
+                # ts = concat_accounts(ts, "slam2 pyramid l", "slam2 pyramid r", "slam2 pyramid")
+                # ts.loc["opencv", "wall_time_start"] += ts.loc["slam2 cb cam", "wall_time_start"].iloc[0]
 
         with ch_time_block.ctx("rename accounts", print_start=False):
             ts = rename_accounts(ts, {
@@ -489,8 +500,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
                 # "camera_cvtfmt": "Camera convert-format",
                 "audio_encoding": "Audio Encoding",
                 "audio_decoding": "Audio Decoding",
-                "slam2 cb imu": "OpenVINS IMU",
-                "slam2 cb cam": "OpenVINS Camera",
+                # "slam2 cb imu": "OpenVINS IMU",
+                # "slam2 cb cam": "OpenVINS Camera",
                 **({
                     "offline_imu_cam cam": "Camera loading",
                     "offline_imu_cam imu": "IMU loading",
@@ -501,11 +512,14 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
             })
 
         summaries = ts.groupby("account_name").agg({
-            "period"            : ["mean", "std"],
-            "cpu_time_duration" : ["mean", "std", "sum"],
-            "wall_time_duration": ["mean", "std", "sum"],
-            "gpu_time_duration" : ["mean", "std", "sum"],
+            "period"            : ["mean", "std", "median"],
+            "cpu_time_duration" : ["mean", "std", "sum", "median"],
+            "wall_time_duration": ["mean", "std", "sum", "median"],
+            "gpu_time_duration" : ["mean", "std", "sum", "median"],
         })
+        for account in summaries.index:
+            summaries.loc[account, "75-ile"] = ts.loc[account, "cpu_time_duration"].quantile(0.75)
+            summaries.loc[account, "95-ile"] = ts.loc[account, "cpu_time_duration"].quantile(0.95)
 
         # flatten column from multiindex (["cpu_duration", "wall_duration", "period"], ["mean", "std", "sum"])
         # to single-level index ("cpu_duration_mean", "cpu_duration_std", "cpu_duration_sum", "wall_duration_mean", ...)
@@ -560,8 +574,9 @@ def correct(conditions: TrialConditions, ts: pd.DataFrame, summaries: pd.DataFra
     }.get(conditions.machine, 60)
     summaries = summaries.copy()
     for xcoding in ["decoding", "encoding"]:
-        summaries.loc[f"audio_{xcoding} iter", "period_mean"] = ts.loc[f"audio_{xcoding} iter", "period"][first_good_audio_iter:].mean()
-        summaries.loc[f"audio_{xcoding} iter", "period_std" ] = ts.loc[f"audio_{xcoding} iter", "period"][first_good_audio_iter:].std ()
+        if f"audio_{xcoding} iter" in summaries.index:
+            summaries.loc[f"audio_{xcoding} iter", "period_mean"] = ts.loc[f"audio_{xcoding} iter", "period"][first_good_audio_iter:].mean()
+            summaries.loc[f"audio_{xcoding} iter", "period_std" ] = ts.loc[f"audio_{xcoding} iter", "period"][first_good_audio_iter:].std ()
 
     replace_names = {
         'app': 'App',
@@ -599,10 +614,10 @@ for metrics_path in Path("../metrics").iterdir():
     output_path.mkdir(exist_ok=True, parents=True)
 
     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions, power_data = power_data)
-    # per_trial_analysis(trial)
+    per_trial_analysis(trial)
     trials.append(trial)
 
-inter_trial_analysis(trials)
+# inter_trial_analysis(trials)
 
 # The Following functions are used for the actual graph generation. Most of these read off of the CSVs generated in the above code block
 # plot_wall_time is the only one that doesnt read from CSVs and needs the above code block
