@@ -16,7 +16,7 @@ def analysis(data: PerTrialData) -> None:
     # stacked_gpu_time(data)
     # stacked_energy(data)
     # time_series(data)
-    # account_time_series(data)
+    account_time_series(data)
     account_time_hists(data)
     # motion_to_photon(data)
     # cpu_timeline(data)
