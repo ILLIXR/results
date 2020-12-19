@@ -6,15 +6,14 @@
 
 # Running the Script
 1. If this is your first time invoking thi script, install the dependencies by `cd results/analysis ; poetry install`.
-2. Run `cd results/analysis ;poetry run python3 main.py`. This will run all of the analyses on all of the data.
+2. Run `cd results/analysis ; poetry run python3 main.py`. This will run all of the analyses on all of the data.
 3. Examine the results in `output/`. Note that `output/$NAME` corresponding to `metrics/$NAME`. `output/account_summaries.md` is a very good place to start.
 
-# Adding an Analysis
+# Adding an Analysis or Plot
 - Per-trial and inter-trial analyses can be found in the `analysis/per-trial-analysis.py` and `analysis/inter-trial-analysis.py` files, respectively.
-- Per-trial analyses takes a single `PerTrialData`, while inter-trial analyses take a `List[PerTrialData]`. See `analysis/util.py:PerTrialAnalysis` for what each attribute means.
+- Per-trial analyses takes a single `PerTrialData`, while inter-trial analyses take a list of `PerTrialData`. See `analysis/util.py` for what each attribute of `PerTrialData` means.
 - The `analysis` functions in each file run all inter-trial or per-trial analysis within.
 - We've found it helpful to comment out the slow ones.
 - Running the analyses is a slow way of revealing errors; To speed up development, you can quickly type check your analyses using Mypy,
-  - `poetry run mypy --strict --ignore-missing-imports main.py`, and on the first time `poetry install --dev`.
-  - Parameter-type: Use `:` after a variable name to signify type (e.g. `def foo(x: int)`).
-  - Return-type: Use `->` to provide what is returned by function (e.g. `def foo() -> int`).
+  - Run `cd results/analysis ; poetry install --dev` and `poetry run mypy --strict --ignore-missing-imports main.py`.
+  - Use `:` and `->` to signify the parameter-types and return-type of new functions (e.g. `def foo(x: int, y: float) -> str`).
