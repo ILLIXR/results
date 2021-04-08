@@ -1,0 +1,8 @@
+machine: glacier
+application: gldemo
+illixr_commit: 355775f7cf4c96ca5f30016f6285623ec7c75e6d
+# branch: project-scheduling-retro
+# fused: no
+# singlecore: no
+# profile: opt
+# open_vins_commit: da29752d425b061f9ebe9a2cefa437c39064c892

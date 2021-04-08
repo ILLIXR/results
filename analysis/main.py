@@ -400,8 +400,11 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
             )
 
         switchboard_topic_stop = switchboard_topic_stop.assign(
-            completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
+            completion = 1.0,
         )
+        # switchboard_topic_stop = switchboard_topic_stop.assign(
+        #     completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
+        # )
         for row in switchboard_topic_stop.itertuples():
             if row.completion < 0.95 and row.unprocessed > 0:
                 warnings.warn("\n".join([
@@ -457,8 +460,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]: #https://dbader.org/blog/writing
             bool_mask_cam = ts.join(imu_cam)["has_camera"].fillna(value=False)
 
             has_zed = "zed_camera_thread iter" in ts.index.levels[0]
-            if not has_zed:
-                assert "offline_imu_cam iter" in ts.index.levels[0]
+            # if not has_zed:
+            #     assert "offline_imu_cam iter" in ts.index.levels[0]
             has_gldemo = "gldemo iter" in ts.index.levels[0]
             if not has_zed:
                 ts = split_account(ts, "offline_imu_cam iter", "offline_imu_cam cam",  bool_mask_cam)
