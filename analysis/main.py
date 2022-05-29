@@ -24,6 +24,7 @@ from inter_trial_analysis import analysis as inter_trial_analysis
 import plot_graphs
 
 def read_illixr_table(metrics_path: Path, table_name: str, index_cols: List[str]) -> pd.DataFrame:
+    print(f"Loading table {table_name}")
     db_path = metrics_path / (table_name + ".sqlite")
     assert db_path.exists()
     return (
@@ -338,7 +339,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             threadloop_iteration   = read_illixr_table(metrics_path, "threadloop_iteration"    , ["plugin_id", "iteration_no"])
             switchboard_callback   = read_illixr_table(metrics_path, "switchboard_callback"    , ["plugin_id", "iteration_no"])
             switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
-            switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
+            # switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
             timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
             imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
             #camera_cvtfmt          = read_illixr_table(metrics_path, "camera_cvtfmt"           , ["iteration_no"])
@@ -412,7 +413,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             )
 
         switchboard_topic_stop = switchboard_topic_stop.assign(
-            completion = lambda df: df["processed"] / (df["unprocessed"] + df["processed"]).clip(lower=1)
+            completion = lambda df: df["enqueued"] / (df["dequeued"] + df["enqueued"]).clip(lower=1)
         )
         for row in switchboard_topic_stop.itertuples():
             if row.completion < 0.95 and row.unprocessed > 0:
@@ -425,7 +426,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             ts = compute_durations(pd.concat([
                 set_account_name(threadloop_iteration, " iter", plugin_name),
                 set_account_name(switchboard_callback, " cb", plugin_name),
-                set_account_name(switchboard_check_qs, "runtime check_qs"),
+                # set_account_name(switchboard_check_qs, "runtime check_qs"),
                 reindex(set_account_name(stdout_cpu_timer)),
                 set_account_name(timewarp_gpu, "timewarp_gl gpu"),
                 #set_account_name(camera_cvtfmt, "camera_cvtfmt"),
@@ -480,6 +481,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             ts = split_account(ts, "slam2 cb", "slam2 cb cam",  bool_mask_cam)
             ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
             ts = reindex(ts, ["slam2 cb cam"])
+
+        print(ts.columns)
 
         with ch_time_block.ctx("concat accounts", print_start=False):
             # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
@@ -543,6 +546,8 @@ run_list = [
     for path in list(Path("..").iterdir())
     if path.name.endswith("metrics-")
 ]
+
+print(run_list)
 
 sponza_list = [
     "metrics-jetsonlp-sponza",
@@ -622,38 +627,38 @@ def write_graphs(
 # Also if you ever need data from the logs, uncomment this and pass the trials var to whatever function needs it
 # Go to the Analysis function in inter_trial_analysis and comment/uncomment whatever CSVs you want to generate
 
-# trials: List[PerTrialData] = []
-# for metrics_path in Path("../metrics").iterdir():
-#     if not (metrics_path / "trial_conditions.yaml").exists():
-#         warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
-#         continue
-#     with (metrics_path / "trial_conditions.yaml").open() as f: 
-#         conditions: Dict[str, str] = yaml.safe_load(f)
-#         conditions_obj = TrialConditions(**conditions)
-#     ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
-#     output_path = Path("../output") / metrics_path.name
-#     output_path.mkdir(exist_ok=True, parents=True)
-#     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
-#     trials.append(trial)
-#     # per_trial_analysis(trial)
-# inter_trial_analysis(trials, replaced_names)
+trials: List[PerTrialData] = []
+for metrics_path in Path("../metrics").iterdir():
+    if not (metrics_path / "trial_conditions.yaml").exists():
+        warnings.warn(f"{metrics_path!s} does not contain `trial_conditions.yaml`. Skipping analysis.")
+        continue
+    with (metrics_path / "trial_conditions.yaml").open() as f: 
+        conditions: Dict[str, str] = yaml.safe_load(f)
+        conditions_obj = TrialConditions(**conditions)
+    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+    output_path = Path("../output") / metrics_path.name
+    output_path.mkdir(exist_ok=True, parents=True)
+    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+    trials.append(trial)
+    # per_trial_analysis(trial)
+inter_trial_analysis(trials, replaced_names)
 
 # The Following functions are used for the actual graph generation. Most of these read off of the CSVs generated in the above code block
 # plot_wall_time is the only one that doesnt read from CSVs and needs the above code block
 
-# plot_graphs.plot_fps(0)
-# plot_graphs.plot_fps(1)
-# plot_graphs.plot_fps(2)
-# plot_graphs.plot_cpu()
-# # plot_graphs.plot_gpu()
-# plot_graphs.plot_power()
-# plot_graphs.plot_power_total()
-# plot_graphs.plot_wall_time(trials)
-# plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'sponza', 60)
-# plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'materials', 30)
-# plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'platformer', 30)
-# plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'ar', 20)
-# plot_graphs.plot_frame_time(0)
-# plot_graphs.plot_frame_time(1)
-# plot_graphs.plot_frame_time(2)
-# plot_graphs.plot_cpu_ipc()
+plot_graphs.plot_fps(0)
+plot_graphs.plot_fps(1)
+plot_graphs.plot_fps(2)
+plot_graphs.plot_cpu()
+# plot_graphs.plot_gpu()
+plot_graphs.plot_power()
+plot_graphs.plot_power_total()
+plot_graphs.plot_wall_time(trials)
+plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'sponza', 60)
+plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'materials', 30)
+plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'platformer', 30)
+plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'ar', 20)
+plot_graphs.plot_frame_time(0)
+plot_graphs.plot_frame_time(1)
+plot_graphs.plot_frame_time(2)
+plot_graphs.plot_cpu_ipc()
