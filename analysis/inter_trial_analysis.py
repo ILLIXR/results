@@ -19,12 +19,12 @@ def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
 
 @ch_time_block.decor(print_start=False, print_args=False)   
 def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
-    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection', 'Playback', 'Encoding']
+    account_list = ['Camera', 'OpenVINS Camera', 'IMU', 'IMU Integrator', 'Application', 'Reprojection']
     data_frame = pd.DataFrame()
     data_frame["Components"] = account_list
 
     for trial in tqdm(trials):
-        account_names = ['OpenVINS Camera', 'zed_camera_thread iter', 'zed_imu_thread iter', 'imu_integrator iter', 'app', 'timewarp_gl iter', 'audio_decoding iter', 'audio_encoding iter']
+        account_names = ['OpenVINS Camera', 'zed_camera_thread iter', 'zed_imu_thread iter', 'gtsam_integrator cb', 'app', 'timewarp_gl iter']
 
         # if trial.conditions.machine == 'jetsonlp' and trial.conditions.application == 'materials':
         #     # import IPython; IPython.embed()
@@ -40,24 +40,28 @@ def populate_fps(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> N
         #     return
 
         values = []
-        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU']
+        ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'OpenVINS IMU', 'audio_decoding iter', 'audio_encoding iter']
+        print(trial.summaries["period_mean"])
         for idx, name in enumerate(account_names):
             if name in ignore_list:
                 continue
             
             # Convert ms to s and then convert period to hz
-            if name == 'audio_decoding iter' or name == 'audio_encoding iter':
-                # First ~200 values seem to be garbage so omit those when calculating the mean
-                ts_temp = trial.ts.reset_index()
-                if trial.conditions.machine == 'jetsonlp':
-                    mean_period = ts_temp[ts_temp["account_name"] == name]['period'][150:].mean() 
-                elif trial.conditions.machine == 'jetsonhp':
-                    mean_period = ts_temp[ts_temp["account_name"] == name]['period'][100:].mean() 
-                else:
-                    mean_period = ts_temp[ts_temp["account_name"] == name]['period'][60:].mean() 
-                values.append(1 / (mean_period * .001))
-            else:
-                values.append(1 / (trial.summaries["period_mean"][name] * .001))
+            print(name)
+
+            # We dont need this stuff 
+            # if name == 'audio_decoding iter' or name == 'audio_encoding iter':
+            #     # First ~200 values seem to be garbage so omit those when calculating the mean
+            #     ts_temp = trial.ts.reset_index()
+            #     if trial.conditions.machine == 'jetsonlp':
+            #         mean_period = ts_temp[ts_temp["account_name"] == name]['period'][150:].mean() 
+            #     elif trial.conditions.machine == 'jetsonhp':
+            #         mean_period = ts_temp[ts_temp["account_name"] == name]['period'][100:].mean() 
+            #     else:
+            #         mean_period = ts_temp[ts_temp["account_name"] == name]['period'][60:].mean() 
+            #     values.append(1 / (mean_period * .001))
+            # else:
+            values.append(1 / (trial.summaries["period_mean"][name] * .001))
 
         data_frame[trial.conditions.application + '-' + trial.conditions.machine] = values
         data_frame.to_csv('../output/fps.csv', index=False)

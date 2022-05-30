@@ -12,12 +12,12 @@ clocks = ["cpu", "wall", "gpu"]
 def analysis(data: PerTrialData) -> None:
     table_summaries(data)
     stacked_cpu_time(data)
-    stacked_gpu_time(data)
-    stacked_energy(data)
-    time_series(data)
-    account_time_series(data)
-    #motion_to_photon(data)
-    cpu_timeline(data)
+    # stacked_gpu_time(data)
+    # stacked_energy(data)
+    # time_series(data)
+    # account_time_series(data)
+    # motion_to_photon(data)
+    # cpu_timeline(data)1
 
 @ch_time_block.decor(print_start=False, print_args=False)   
 def table_summaries(data: PerTrialData) -> None:
@@ -32,9 +32,6 @@ def table_summaries(data: PerTrialData) -> None:
         f.write("\n\n")
         f.write("# Thread IDs (of long-running threads)\n\n")
         f.write(data.thread_ids.sort_values(["name", "sub_name"]).to_markdown())
-        f.write("\n\n")
-        f.write("# Switchboard topic stops\n\n")
-        f.write(data.switchboard_topic_stop.to_markdown(floatfmt=["", ".0f", ".0f", ".2f"]))
         f.write("\n\n")
         f.write("# Notes\n\n")
         f.write("- All times are in milliseconds unless otherwise mentioned.\n")
@@ -61,45 +58,44 @@ def stacked_cpu_time(data: PerTrialData) -> None:
         'zed_imu_thread iter': 'IMU',
         'zed_camera_thread iter': 'Camera',
         'timewarp_gl iter': 'Reprojection',
-        'hologram iter': 'Hologram',
-        'audio_encoding iter': 'Encoding',
-        'audio_decoding iter': 'Playback',
         # GPU Values
         'timewarp_gl gpu': 'Reprojection',
-        'hologram': 'Hologram',
     }
     # Stacked graphs
-    total_cpu_time = 0.0
+    total_cpu_time = data.summaries["cpu_time_duration_sum"]['app']
     plt.rcParams.update({'font.size': 8})
+    
     # App is only in this list because we want to make it appear at the top of the graph
     ignore_list = ['opencv', 'Runtime', 'camera_cvtfmt', 'app_gpu1', 'app_gpu2', 'hologram', 'timewarp_gl gpu', 'app']
     account_names = data.ts.index.levels[0]
     for account_name in account_names:
-        if account_name in ignore_list:
-            continue
-        total_cpu_time += data.summaries["cpu_time_duration_sum"][account_name]
-    total_cpu_time += data.summaries["cpu_time_duration_sum"]['app']
+        if account_name not in ignore_list:
+            total_cpu_time += data.summaries["cpu_time_duration_sum"][account_name]
+
     width = 0.4
     bar_plots = []
     rolling_sum = 0.0
     for idx, name in enumerate(account_names):
-        if name in ignore_list:
-            continue
-        bar_height = data.summaries["cpu_time_duration_sum"][name]
-        bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
-        rolling_sum += bar_height
+        if name not in ignore_list:
+            bar_height = data.summaries["cpu_time_duration_sum"][name]
+            bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
+            rolling_sum += bar_height
+
     # This is only because we want the app section at the top
     bar_height = data.summaries["cpu_time_duration_sum"]['app']
     bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
     rolling_sum += bar_height
+
     plt.title('CPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
     plt.yticks(np.arange(0, rolling_sum+1, rolling_sum / 10))
     plt.ylabel('Total CPU Time')
     plt.subplots_adjust(right=0.7)
+
     account_list = [name for name in account_names if name not in ignore_list]
     account_list.append('app')
     account_list = [replaced_names[name] if name in replaced_names else name for name in account_list]
+
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
     plt.savefig(data.output_path / "stacked.png")

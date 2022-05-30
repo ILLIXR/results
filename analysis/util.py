@@ -49,10 +49,6 @@ class PerTrialData(NamedTuple):
     # Each row has "thread_id", "name", "sub_name".
     thread_ids: pd.DataFrame
 
-    # Each row has "topic_name" (index), "processed", "unprocessed", "completion" (completion ratio)
-    # This is useful to tell if frames were still in the switchboard buffer at shutdown-time.
-    switchboard_topic_stop: pd.DataFrame
-
     # [m]otion-[t]o-[p]hoton
     # Each row (conceptually a "vsync-graphics-cycle") has "imu_to_display", "predict_to_display", "render_to_display", and "wall_time" (of vsync)
     mtp: pd.DataFrame

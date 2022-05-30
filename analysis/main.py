@@ -338,7 +338,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             plugin_name            = read_illixr_table(metrics_path, "plugin_name"             , ["plugin_id"])
             threadloop_iteration   = read_illixr_table(metrics_path, "threadloop_iteration"    , ["plugin_id", "iteration_no"])
             switchboard_callback   = read_illixr_table(metrics_path, "switchboard_callback"    , ["plugin_id", "iteration_no"])
-            switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
+            # switchboard_topic_stop = read_illixr_table(metrics_path, "switchboard_topic_stop"  , ["topic_name"])
             # switchboard_check_qs   = read_illixr_table(metrics_path, "switchboard_check_queues", ["iteration_no"])
             timewarp_gpu           = read_illixr_table(metrics_path, "timewarp_gpu"            , ["iteration_no"])
             imu_cam                = read_illixr_table(metrics_path, "imu_cam"                 , ["iteration_no"])
@@ -412,15 +412,15 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
                 .sort_index()
             )
 
-        switchboard_topic_stop = switchboard_topic_stop.assign(
-            completion = lambda df: df["enqueued"] / (df["dequeued"] + df["enqueued"]).clip(lower=1)
-        )
-        for row in switchboard_topic_stop.itertuples():
-            if row.completion < 0.95 and row.unprocessed > 0:
-                warnings.warn("\n".join([
-                    f"{row.Index} has many ({row.unprocessed} / {(row.unprocessed + row.processed)}) unprocessed events when ILLIXR terminated.",
-                    "Your hardware resources might be oversubscribed.",
-                ]) , UserWarning)
+        # switchboard_topic_stop = switchboard_topic_stop.assign(
+        #     completion = lambda df: df["enqueued"] / (df["dequeued"] + df["enqueued"]).clip(lower=1)
+        # )
+        # for row in switchboard_topic_stop.itertuples():
+        #     if row.completion < 0.95 and row.unprocessed > 0:
+        #         warnings.warn("\n".join([
+        #             f"{row.Index} has many ({row.unprocessed} / {(row.unprocessed + row.processed)}) unprocessed events when ILLIXR terminated.",
+        #             "Your hardware resources might be oversubscribed.",
+        #         ]) , UserWarning)
 
         with ch_time_block.ctx("concat data", print_start=False):
             ts = compute_durations(pd.concat([
@@ -482,7 +482,8 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
             ts = split_account(ts, "slam2 cb", "slam2 cb imu", ~bool_mask_cam)
             ts = reindex(ts, ["slam2 cb cam"])
 
-        print(ts.columns)
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+            print(ts.columns)
 
         with ch_time_block.ctx("concat accounts", print_start=False):
             # ts = concat_accounts(ts, "timewarp_gl iter", "timewarp_gl gpu", "Timewarp")
@@ -534,7 +535,7 @@ def get_data(metrics_path: Path) -> Tuple[Any]:
         mtp["wall_time"] = (mtp["vsync"] - mtp["vsync"].iloc[0]) / 1e6
         del mtp["vsync"]
 
-        return ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp
+        return ts, summaries, thread_ids, warnings_log, power_data, mtp
 
 # @ch_cache.decor(ch_cache.FileStore.create(Path(".cache/")))
 def get_data_cached(metrics_path: Path) -> Tuple[Any]:
@@ -602,7 +603,7 @@ def write_graphs(
 ) -> None:
     for run_name in tqdm(name_list):
         metrics_path = Path("../metrics") / f"{run_name}"
-        ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
+        ts, summaries, thread_ids, warnings_log, power_data, mtp = get_data_cached(metrics_path)
 
         accounts = ts.index.levels[0]
 
@@ -635,30 +636,30 @@ for metrics_path in Path("../metrics").iterdir():
     with (metrics_path / "trial_conditions.yaml").open() as f: 
         conditions: Dict[str, str] = yaml.safe_load(f)
         conditions_obj = TrialConditions(**conditions)
-    ts, summaries, switchboard_topic_stop, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
+    ts, summaries, thread_ids, warnings_log, power_data, mtp = get_data(metrics_path)
     output_path = Path("../output") / metrics_path.name
     output_path.mkdir(exist_ok=True, parents=True)
-    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, switchboard_topic_stop = switchboard_topic_stop, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
+    trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
     trials.append(trial)
-    # per_trial_analysis(trial)
-inter_trial_analysis(trials, replaced_names)
+    per_trial_analysis(trial)
+# inter_trial_analysis(trials, replaced_names)
 
 # The Following functions are used for the actual graph generation. Most of these read off of the CSVs generated in the above code block
 # plot_wall_time is the only one that doesnt read from CSVs and needs the above code block
 
-plot_graphs.plot_fps(0)
-plot_graphs.plot_fps(1)
-plot_graphs.plot_fps(2)
-plot_graphs.plot_cpu()
-# plot_graphs.plot_gpu()
-plot_graphs.plot_power()
-plot_graphs.plot_power_total()
-plot_graphs.plot_wall_time(trials)
-plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'sponza', 60)
-plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'materials', 30)
-plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'platformer', 30)
-plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'ar', 20)
-plot_graphs.plot_frame_time(0)
-plot_graphs.plot_frame_time(1)
-plot_graphs.plot_frame_time(2)
-plot_graphs.plot_cpu_ipc()
+# plot_graphs.plot_fps(0)
+# plot_graphs.plot_fps(1)
+# plot_graphs.plot_fps(2)
+# plot_graphs.plot_cpu()
+# # plot_graphs.plot_gpu()
+# plot_graphs.plot_power()
+# plot_graphs.plot_power_total()
+# plot_graphs.plot_wall_time(trials)
+# plot_graphs.plot_mtp(['desktop-sponza', 'jetsonhp-sponza', 'jetsonlp-sponza'], 'sponza', 60)
+# plot_graphs.plot_mtp(['desktop-materials', 'jetsonhp-materials', 'jetsonlp-materials'], 'materials', 30)
+# plot_graphs.plot_mtp(['desktop-platformer', 'jetsonhp-platformer', 'jetsonlp-platformer'], 'platformer', 30)
+# plot_graphs.plot_mtp(['desktop-demo', 'jetsonhp-demo', 'jetsonlp-demo'], 'ar', 20)
+# plot_graphs.plot_frame_time(0)
+# plot_graphs.plot_frame_time(1)
+# plot_graphs.plot_frame_time(2)
+# plot_graphs.plot_cpu_ipc()

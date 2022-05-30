@@ -63,11 +63,11 @@ def plot_fps(trial_num):
 
     # Uncomment one of these at a time depending on if you want to gen Desktop/Jetson HP/Jetson LP FPS values
     if trial_num == 0:
-        create_row(data, axes, ['sponza-desktop', 'materials-desktop', 'platformer-desktop', 'demo-desktop'])
-    elif trial_num == 1: 
-        create_row(data, axes, ['sponza-jetsonhp', 'materials-jetsonhp', 'platformer-jetsonhp', 'demo-jetsonhp'])
-    else:
-        create_row(data, axes, ['sponza-jetsonlp', 'materials-jetsonlp', 'platformer-jetsonlp', 'demo-jetsonlp'])
+        create_row(data, axes, ['desktop-sponza', 'desktop-materials', 'desktop-platformer', 'desktop-demo'])
+    # elif trial_num == 1: 
+    #     create_row(data, axes, ['sponza-jetsonhp', 'materials-jetsonhp', 'platformer-jetsonhp', 'demo-jetsonhp'])
+    # else:
+    #     create_row(data, axes, ['sponza-jetsonlp', 'materials-jetsonlp', 'platformer-jetsonlp', 'demo-jetsonlp'])
 
     if trial_num == 0:
         axes[0].legend(loc='lower right', prop={'size': 12}, fontsize=14)
