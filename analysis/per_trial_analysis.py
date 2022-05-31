@@ -12,12 +12,12 @@ clocks = ["cpu", "wall", "gpu"]
 def analysis(data: PerTrialData) -> None:
     table_summaries(data)
     stacked_cpu_time(data)
-    # stacked_gpu_time(data)
+    stacked_gpu_time(data)
     # stacked_energy(data)
-    # time_series(data)
-    # account_time_series(data)
+    time_series(data)
+    account_time_series(data)
     # motion_to_photon(data)
-    # cpu_timeline(data)1
+    cpu_timeline(data)
 
 @ch_time_block.decor(print_start=False, print_args=False)   
 def table_summaries(data: PerTrialData) -> None:
@@ -114,12 +114,12 @@ def stacked_gpu_time(data: PerTrialData) -> None:
     width = 0.4
     bar_plots = []
     app_num = data.summaries["gpu_time_duration_sum"]["app_gpu1"] + data.summaries["gpu_time_duration_sum"]["app_gpu2"]
-    bar_plots.append(plt.bar(1, data.summaries["gpu_time_duration_sum"]["hologram"], width=width, bottom=0, color="brown")[0])
-    bar_plots.append(plt.bar(1, data.summaries["gpu_time_duration_sum"]["timewarp_gl gpu"], width=width, bottom=data.summaries["gpu_time_duration_sum"]["hologram"])[0])
-    bar_plots.append(plt.bar(1, app_num, width=width, bottom=data.summaries["gpu_time_duration_sum"]["timewarp_gl gpu"] + data.summaries["gpu_time_duration_sum"]["hologram"])[0])
+    # bar_plots.append(plt.bar(1, data.summaries["gpu_time_duration_sum"]["hologram"], width=width, bottom=0, color="brown")[0])
+    bar_plots.append(plt.bar(1, data.summaries["gpu_time_duration_sum"]["timewarp_gl gpu"], width=width, bottom=0))
+    bar_plots.append(plt.bar(1, app_num, width=width, bottom=data.summaries["gpu_time_duration_sum"]["timewarp_gl gpu"]))
     plt.title('GPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
-    rolling_sum = app_num + data.summaries["gpu_time_duration_sum"]["timewarp_gl gpu"] + data.summaries["gpu_time_duration_sum"]["hologram"]
+    rolling_sum = app_num + data.summaries["gpu_time_duration_sum"]["timewarp_gl gpu"]
     plt.yticks(np.arange(0, rolling_sum+1, rolling_sum/10))
     plt.ylabel('Total GPU Time')
     plt.subplots_adjust(right=0.7)
@@ -203,8 +203,8 @@ def account_time_series(data: PerTrialData) -> None:
 def motion_to_photon(data: PerTrialData) -> None:
     fig = plt.figure()
     ax = plt.gca()
-    ys = (data.mtp["vsync"] - data.mtp["imu_time"]) / 1e6
-    xs = (data.mtp["vsync"] - data.mtp["vsync"].iloc[0]) / 1e9
+    ys = data.mtp['render_to_display']
+    xs = data.mtp.index
     ax.plot(xs, ys)
     ax.set_xlabel("Time since application start (sec)")
     ax.set_ylabel("Motion-to-photon (ms)")

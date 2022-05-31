@@ -8,7 +8,8 @@ from tqdm import tqdm
 def plot_fps(trial_num):
     plt.clf()
     data = pd.read_csv('../output/fps.csv')
-    fig, axes = plt.subplots(1, 4, gridspec_kw={'width_ratios': [2, 2, 2, 2]})
+    # fig, axes = plt.subplots(1, 4, gridspec_kw={'width_ratios': [2, 2, 2, 2]})
+    fig, axes = plt.subplots(1, 3, gridspec_kw={'width_ratios': [2, 2, 2]})
 
     def create_row(data, ax_row, trials):
         width = 0.35  # the width of the bars
@@ -49,21 +50,24 @@ def plot_fps(trial_num):
         ax_row[2].bar(x + (width * 0.60), platformer_fps, width, label='Platformer', color='royalblue')
         ax_row[2].bar(x + (width * 1.80), demo_fps, width, label='AR Demo', color='green')
 
-        labels = ['Playback', 'Encoding']
-        x = np.arange(len(labels)) * 2  # the label locations
-        sponza_fps = data[trials[0]][6:8]
-        materials_fps = data[trials[1]][6:8]
-        platformer_fps = data[trials[2]][6:8]
-        demo_fps = data[trials[3] ][6:8]
+        ### no audio
+        # labels = ['Playback', 'Encoding']
+        # x = np.arange(len(labels)) * 2  # the label locations
+        # sponza_fps = data[trials[0]][6:8]
+        # materials_fps = data[trials[1]][6:8]
+        # platformer_fps = data[trials[2]][6:8]
+        # demo_fps = data[trials[3] ][6:8]
 
-        ax_row[3].bar(x - (width * 1.80), sponza_fps, width, label='Sponza', color='darkred')
-        ax_row[3].bar(x - (width * 0.60), materials_fps, width, label='Materials', color='indigo')
-        ax_row[3].bar(x + (width * 0.60), platformer_fps, width, label='Platformer', color='royalblue')
-        ax_row[3].bar(x + (width * 1.80), demo_fps, width, label='AR Demo', color='green')
+        # ax_row[3].bar(x - (width * 1.80), sponza_fps, width, label='Sponza', color='darkred')
+        # ax_row[3].bar(x - (width * 0.60), materials_fps, width, label='Materials', color='indigo')
+        # ax_row[3].bar(x + (width * 0.60), platformer_fps, width, label='Platformer', color='royalblue')
+        # ax_row[3].bar(x + (width * 1.80), demo_fps, width, label='AR Demo', color='green')
 
     # Uncomment one of these at a time depending on if you want to gen Desktop/Jetson HP/Jetson LP FPS values
     if trial_num == 0:
-        create_row(data, axes, ['desktop-sponza', 'desktop-materials', 'desktop-platformer', 'desktop-demo'])
+        # create_row(data, axes, ['desktop-sponza', 'desktop-materials', 'desktop-platformer', 'desktop-demo'])
+        print(data)
+        create_row(data, axes, ['demo-desktop', 'demo-desktop2', 'demo-desktop3', 'demo-desktop'])
     # elif trial_num == 1: 
     #     create_row(data, axes, ['sponza-jetsonhp', 'materials-jetsonhp', 'platformer-jetsonhp', 'demo-jetsonhp'])
     # else:
@@ -94,12 +98,13 @@ def plot_fps(trial_num):
     axes[2].set_yticks(np.arange(9) * 15)
     axes[2].set_ylim(bottom=0, top=120.01)
 
-    labels = ['Playback', 'Encoding']
-    axes[3].set_xticks(np.arange(len(labels)) * 2)
-    axes[3].set_xticklabels(labels, fontsize=11)
-    axes[3].set_xlabel('Audio', fontsize=14)
-    axes[3].set_yticks(np.arange(9) * 6)
-    axes[3].set_ylim(bottom=0, top=48.01)
+    ### no audio
+    # labels = ['Playback', 'Encoding']
+    # axes[3].set_xticks(np.arange(len(labels)) * 2)
+    # axes[3].set_xticklabels(labels, fontsize=11)
+    # axes[3].set_xlabel('Audio', fontsize=14)
+    # axes[3].set_yticks(np.arange(9) * 6)
+    # axes[3].set_ylim(bottom=0, top=48.01)
 
     fig.set_size_inches(8, 2.5)
     fig.tight_layout()

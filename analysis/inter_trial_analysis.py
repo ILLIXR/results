@@ -7,14 +7,14 @@ import charmonium.time_block as ch_time_block
 def analysis(trials: List[PerTrialData], replaced_names: Dict[str,str]) -> None:
     print("\U0001f600")
     populate_fps(trials, replaced_names)
-    # populate_cpu(trials, replaced_names)
-    # populate_gpu(trials, replaced_names)
+    populate_cpu(trials, replaced_names)
+    populate_gpu(trials, replaced_names)
     # populate_power(trials, replaced_names)
-    # populate_mtp(trials, replaced_names)
-    # populate_frame_time_mean(trials, replaced_names)
-    # populate_frame_time_std(trials, replaced_names)
-    # populate_frame_time_min(trials, replaced_names)
-    # populate_frame_time_max(trials, replaced_names)
+    populate_mtp(trials, replaced_names)
+    populate_frame_time_mean(trials, replaced_names)
+    populate_frame_time_std(trials, replaced_names)
+    populate_frame_time_min(trials, replaced_names)
+    populate_frame_time_max(trials, replaced_names)
 
 
 @ch_time_block.decor(print_start=False, print_args=False)   
@@ -264,6 +264,7 @@ def populate_power(trials: List[PerTrialData], replaced_names: Dict[str,str]) ->
             values = {"Run Name": trial.conditions.application + '-'+ trial.conditions.machine, 'GPU Power': gpu_power, 'CPU Power': cpu_power, 'DDR Power': ddr_power}
             data_frame = data_frame.append(values, ignore_index=True, sort=False)
         else:
+            print(trial.power_data)
             values = {"Run Name": trial.conditions.application + '-'+ trial.conditions.machine, 'GPU Power': trial.power_data[1], 'DDR Power': trial.power_data[2], 'CPU Power': trial.power_data[3], 'SOC Power': trial.power_data[4], 'SYS Power': trial.power_data[5]}
             data_frame = data_frame.append(values, ignore_index=True, sort=False)
 

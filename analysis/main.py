@@ -641,16 +641,16 @@ for metrics_path in Path("../metrics").iterdir():
     output_path.mkdir(exist_ok=True, parents=True)
     trial = PerTrialData(ts = ts, summaries = summaries, thread_ids = thread_ids, output_path = output_path, mtp = mtp, warnings_log = warnings_log, conditions = conditions_obj, power_data = power_data)
     trials.append(trial)
-    per_trial_analysis(trial)
-# inter_trial_analysis(trials, replaced_names)
+    # per_trial_analysis(trial)
+inter_trial_analysis(trials, replaced_names)
 
 # The Following functions are used for the actual graph generation. Most of these read off of the CSVs generated in the above code block
 # plot_wall_time is the only one that doesnt read from CSVs and needs the above code block
 
-# plot_graphs.plot_fps(0)
+plot_graphs.plot_fps(0)
 # plot_graphs.plot_fps(1)
 # plot_graphs.plot_fps(2)
-# plot_graphs.plot_cpu()
+plot_graphs.plot_cpu()
 # # plot_graphs.plot_gpu()
 # plot_graphs.plot_power()
 # plot_graphs.plot_power_total()
