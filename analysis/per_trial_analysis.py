@@ -7,6 +7,8 @@ from util import list_concat, TrialConditions, PerTrialData
 from typing import List, Dict
 from warnings import WarningMessage
 import charmonium.time_block as ch_time_block
+from tabulate import tabulate
+
 clocks = ["cpu", "wall", "gpu"]
     
 def analysis(data: PerTrialData) -> None:
@@ -26,6 +28,7 @@ def table_summaries(data: PerTrialData) -> None:
         columns = ["count"] + [col for col in data.summaries.columns if col != "count"]
         floatfmt = ["", ".0f", ".1f", ".1f"] + list_concat(["e", "e", "e"] for clock in clocks)
         f.write(data.summaries[columns].to_markdown(floatfmt=floatfmt))
+        print(tabulate(data.summaries[columns]))
         f.write("\n\n")
         f.write("# Totals\n\n")
         f.write(data.summaries[["cpu_time_duration_sum", "gpu_time_duration_sum"]].sum().to_markdown())
@@ -58,6 +61,8 @@ def stacked_cpu_time(data: PerTrialData) -> None:
         'zed_imu_thread iter': 'IMU',
         'zed_camera_thread iter': 'Camera',
         'timewarp_gl iter': 'Reprojection',
+        'audio_encoding iter': 'Encoding',
+        'audio_decoding iter': 'Playback',
         # GPU Values
         'timewarp_gl gpu': 'Reprojection',
     }
@@ -78,6 +83,7 @@ def stacked_cpu_time(data: PerTrialData) -> None:
     for idx, name in enumerate(account_names):
         if name not in ignore_list:
             bar_height = data.summaries["cpu_time_duration_sum"][name]
+            print(name, bar_height)
             bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
             rolling_sum += bar_height
 
@@ -85,6 +91,7 @@ def stacked_cpu_time(data: PerTrialData) -> None:
     bar_height = data.summaries["cpu_time_duration_sum"]['app']
     bar_plots.append(plt.bar(1, bar_height, width=width, bottom=rolling_sum)[0])
     rolling_sum += bar_height
+    print('app', bar_height)
 
     plt.title('CPU Time Breakdown Per Run')
     plt.xticks(np.arange(0, 1, step=1))
@@ -98,6 +105,7 @@ def stacked_cpu_time(data: PerTrialData) -> None:
 
     plt.legend([x for x in bar_plots][::-1], account_list[::-1], bbox_to_anchor=(1.04,0), loc="lower left", borderaxespad=0)
     plt.xlabel("Full System")
+    print(data.output_path)
     plt.savefig(data.output_path / "stacked.png")
     plt.close()
   
